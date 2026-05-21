@@ -1,0 +1,30 @@
+[package]
+name = "dodotabs"
+version = "1.0.0-beta"
+description = "Guitar tab player powered by alphaTab"
+authors = ["DodoTabs"]
+edition = "2021"
+rust-version = "1.77.2"
+
+# The `_lib` suffix avoids a name collision with the binary on Windows.
+[lib]
+name = "dodotabs_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-os = "2"
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Embedded LAN library server
+axum = "0.7"
+tower-http = { version = "0.6", features = ["cors"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "fs"] }
+walkdir = "2"
+local-ip-address = "0.6"
