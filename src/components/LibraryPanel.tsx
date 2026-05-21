@@ -3,14 +3,21 @@ import {
   type LoadedFile,
   type RemoteTab,
   isDesktopHost,
+  isTauriRuntime,
   openLocalFile,
   pickLibraryFolder,
   startLibraryServer,
   getLibraryStatus,
   fetchRemoteTabs,
   fetchRemoteTab,
+  getLocalLibrary,
+  setupLocalLibrary,
+  saveToLibrary,
+  listLocalTabs,
+  loadLocalTab,
+  downloadInBrowser,
 } from "../lib/runtime";
-import { FileIcon, FolderIcon, NetworkIcon, CloseIcon } from "./Icons";
+import { FileIcon, FolderIcon, NetworkIcon, CloseIcon, DownloadIcon } from "./Icons";
 
 interface Props {
   onLoad: (file: LoadedFile) => void;
@@ -27,7 +34,13 @@ export default function LibraryPanel({ onLoad, onClose }: Props) {
   const [remoteUrl, setRemoteUrl] = useState(localStorage.getItem(REMOTE_URL_KEY) ?? "");
   const [remoteTabs, setRemoteTabs] = useState<RemoteTab[]>([]);
   const [busy, setBusy] = useState(false);
+  const [downloading, setDownloading] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  // The download destination on this device, and what's already saved there.
+  const tauri = isTauriRuntime();
+  const [localLib, setLocalLib] = useState<string | null>(getLocalLibrary());
+  const [localTabs, setLocalTabs] = useState<RemoteTab[]>([]);
 
   useEffect(() => {
     isDesktopHost().then(async (isHost) => {
@@ -42,7 +55,9 @@ export default function LibraryPanel({ onLoad, onClose }: Props) {
         }
       }
     });
-  }, []);
+    const lib = getLocalLibrary();
+    if (lib && tauri) listLocalTabs(lib).then(setLocalTabs).catch(() => {});
+  }, [tauri]);
 
   const handleOpenFile = async () => {
     const file = await openLocalFile();
@@ -96,6 +111,60 @@ export default function LibraryPanel({ onLoad, onClose }: Props) {
       setBusy(false);
     }
   };
+
+  const handleSetupLibrary = async () => {
+    setMessage(null);
+    try {
+      const dir = await setupLocalLibrary();
+      if (dir) {
+        setLocalLib(dir);
+        setLocalTabs(await listLocalTabs(dir));
+      }
+    } catch (e) {
+      setMessage(`Could not set up the library folder: ${String(e)}`);
+    }
+  };
+
+  const handleDownload = async (tab: RemoteTab) => {
+    setMessage(null);
+    setDownloading(tab.path);
+    try {
+      const file = await fetchRemoteTab(remoteUrl, tab.path);
+      if (tauri) {
+        if (!localLib) {
+          setMessage("Set up a download folder first.");
+          return;
+        }
+        await saveToLibrary(localLib, file);
+        setLocalTabs(await listLocalTabs(localLib));
+        setMessage(`Saved "${file.name}" to this device.`);
+      } else {
+        downloadInBrowser(file);
+        setMessage(`Downloading "${file.name}".`);
+      }
+    } catch (e) {
+      setMessage(`Download failed: ${String(e)}`);
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  const handleLoadLocal = async (tab: RemoteTab) => {
+    if (!localLib) return;
+    setBusy(true);
+    try {
+      const file = await loadLocalTab(localLib, tab.path);
+      onLoad(file);
+      onClose();
+    } catch (e) {
+      setMessage(`Failed to open: ${String(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // In Tauri, downloads need a destination folder; the browser uses a normal download.
+  const canDownload = !tauri || !!localLib;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -151,19 +220,68 @@ export default function LibraryPanel({ onLoad, onClose }: Props) {
             </button>
           </div>
 
+          {tauri && (
+            <div className="lib-dest">
+              {localLib ? (
+                <span>
+                  Downloads save to <code>{localLib}</code>.{" "}
+                  <button className="link-btn" onClick={handleSetupLibrary}>
+                    {host ? "Change folder" : "Change"}
+                  </button>
+                </span>
+              ) : (
+                <span>
+                  <button className="link-btn" onClick={handleSetupLibrary}>
+                    {host ? "Choose a download folder" : "Set up phone library"}
+                  </button>{" "}
+                  to download tabs to this device.
+                </span>
+              )}
+            </div>
+          )}
+
           {remoteTabs.length > 0 && (
             <ul className="tab-list">
               {remoteTabs.map((t) => (
                 <li key={t.path}>
-                  <button onClick={() => handleLoadRemote(t)} disabled={busy}>
+                  <button className="tab-list__open" onClick={() => handleLoadRemote(t)} disabled={busy}>
                     <FileIcon />
                     <span>{t.name}</span>
+                  </button>
+                  <button
+                    className="tab-list__dl"
+                    onClick={() => handleDownload(t)}
+                    disabled={!canDownload || downloading === t.path}
+                    title={
+                      canDownload
+                        ? "Download to this device"
+                        : "Set up a download folder first"
+                    }
+                    aria-label="Download to this device"
+                  >
+                    <DownloadIcon />
                   </button>
                 </li>
               ))}
             </ul>
           )}
         </section>
+
+        {tauri && localLib && localTabs.length > 0 && (
+          <section className="modal__section">
+            <h3>On this device</h3>
+            <ul className="tab-list">
+              {localTabs.map((t) => (
+                <li key={t.path}>
+                  <button className="tab-list__open" onClick={() => handleLoadLocal(t)} disabled={busy}>
+                    <FileIcon />
+                    <span>{t.name}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {message && <div className="modal__message">{message}</div>}
       </div>

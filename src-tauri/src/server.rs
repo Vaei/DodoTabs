@@ -30,8 +30,8 @@ pub struct LibraryState {
 
 #[derive(Serialize)]
 pub struct TabEntry {
-    path: String,
-    name: String,
+    pub path: String,
+    pub name: String,
 }
 
 #[derive(Deserialize)]
@@ -39,26 +39,23 @@ struct FileQuery {
     path: String,
 }
 
-fn is_supported(path: &Path) -> bool {
+pub fn is_supported(path: &Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
         .map(|e| SUPPORTED_EXTENSIONS.contains(&e.to_lowercase().as_str()))
         .unwrap_or(false)
 }
 
-async fn list_tabs(State(state): State<LibraryState>) -> impl IntoResponse {
-    let folder = { state.folder.lock().unwrap().clone() };
-    let Some(folder) = folder else {
-        return Json(Vec::<TabEntry>::new());
-    };
-
-    let mut entries: Vec<TabEntry> = WalkDir::new(&folder)
+/// Recursively lists the supported tab files in `folder`, sorted by name.
+/// Shared by the LAN server and the local-library command.
+pub fn list_supported(folder: &Path) -> Vec<TabEntry> {
+    let mut entries: Vec<TabEntry> = WalkDir::new(folder)
         .follow_links(false)
         .into_iter()
         .filter_map(Result::ok)
         .filter(|e| e.file_type().is_file() && is_supported(e.path()))
         .filter_map(|e| {
-            let rel = e.path().strip_prefix(&folder).ok()?;
+            let rel = e.path().strip_prefix(folder).ok()?;
             Some(TabEntry {
                 path: rel.to_string_lossy().replace('\\', "/"),
                 name: e.file_name().to_string_lossy().to_string(),
@@ -67,7 +64,15 @@ async fn list_tabs(State(state): State<LibraryState>) -> impl IntoResponse {
         .collect();
 
     entries.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-    Json(entries)
+    entries
+}
+
+async fn list_tabs(State(state): State<LibraryState>) -> impl IntoResponse {
+    let folder = { state.folder.lock().unwrap().clone() };
+    let Some(folder) = folder else {
+        return Json(Vec::<TabEntry>::new());
+    };
+    Json(list_supported(&folder))
 }
 
 async fn get_file(

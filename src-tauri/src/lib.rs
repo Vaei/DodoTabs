@@ -72,6 +72,57 @@ fn read_file(path: String) -> Result<Vec<u8>, String> {
     std::fs::read(&path).map_err(|e| e.to_string())
 }
 
+/// Resolves (and creates) the app's own library folder. Used on Android, where
+/// arbitrary user folders aren't writable, as the destination for downloaded tabs.
+#[tauri::command]
+fn default_library_dir(app: tauri::AppHandle) -> Result<String, String> {
+    let base = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|e| e.to_string())?;
+    let dir = base.join("library");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir.to_string_lossy().to_string())
+}
+
+/// Strips any path components and characters that are illegal in file names,
+/// so a downloaded tab always lands as a flat file inside the library folder.
+fn safe_file_name(name: &str) -> String {
+    name.rsplit(['/', '\\'])
+        .next()
+        .unwrap_or(name)
+        .chars()
+        .filter(|c| !matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*' | '\0'))
+        .collect::<String>()
+        .trim()
+        .to_string()
+}
+
+/// Writes downloaded tab bytes into the local library folder. Returns the path.
+#[tauri::command]
+fn save_tab(dir: String, name: String, bytes: Vec<u8>) -> Result<String, String> {
+    let dirp = PathBuf::from(&dir);
+    std::fs::create_dir_all(&dirp).map_err(|e| e.to_string())?;
+    let fname = safe_file_name(&name);
+    if fname.is_empty() {
+        return Err("Invalid file name".into());
+    }
+    let dest = dirp.join(&fname);
+    std::fs::write(&dest, &bytes).map_err(|e| e.to_string())?;
+    Ok(dest.to_string_lossy().to_string())
+}
+
+/// Lists the supported tab files already saved in the local library folder.
+#[tauri::command]
+fn list_local_tabs(dir: String) -> Vec<server::TabEntry> {
+    let p = PathBuf::from(&dir);
+    if p.is_dir() {
+        server::list_supported(&p)
+    } else {
+        Vec::new()
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -91,7 +142,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             start_library_server,
             get_library_status,
-            read_file
+            read_file,
+            default_library_dir,
+            save_tab,
+            list_local_tabs
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

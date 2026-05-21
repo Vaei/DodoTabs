@@ -204,3 +204,68 @@ export async function fetchRemoteTab(baseUrl: string, path: string): Promise<Loa
     source: { kind: "remote", baseUrl: base, path },
   };
 }
+
+// ---- Local library (download destination on the client) -----------------
+//
+// Tabs fetched from a host can be saved to a folder on this device so they can
+// be played later without the host online. On Android arbitrary user folders
+// aren't writable, so we use the app's own data folder; on desktop the user
+// picks a real folder; a plain browser has no folder (it uses a normal download).
+
+const LOCAL_LIB_KEY = "dodotabs.localLibrary";
+
+/** The configured download folder, or null if the user hasn't set one up. */
+export function getLocalLibrary(): string | null {
+  return localStorage.getItem(LOCAL_LIB_KEY);
+}
+
+/** Choose / initialize the local library folder. Returns the path (or null if cancelled). */
+export async function setupLocalLibrary(): Promise<string | null> {
+  if (!inTauri()) return null; // browser has no persistent folder
+  let dir: string | null;
+  if (await isDesktopHost()) {
+    dir = await pickLibraryFolder();
+  } else {
+    const { invoke } = await import("@tauri-apps/api/core");
+    dir = await invoke<string>("default_library_dir");
+  }
+  if (dir) localStorage.setItem(LOCAL_LIB_KEY, dir);
+  return dir;
+}
+
+/** Saves tab bytes into the local library folder. Returns the written path. */
+export async function saveToLibrary(
+  dir: string,
+  file: { name: string; data: Uint8Array }
+): Promise<string> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<string>("save_tab", {
+    dir,
+    name: file.name,
+    bytes: Array.from(file.data),
+  });
+}
+
+/** Lists tabs already saved in the local library folder. */
+export async function listLocalTabs(dir: string): Promise<RemoteTab[]> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<RemoteTab[]>("list_local_tabs", { dir });
+}
+
+/** Loads a tab from the local library by its folder-relative path. */
+export async function loadLocalTab(dir: string, rel: string): Promise<LoadedFile> {
+  const path = `${dir}/${rel}`;
+  const data = await readTauriFile(path);
+  return { name: basename(rel), data, source: { kind: "localPath", path } };
+}
+
+/** Triggers a normal browser download (used when there is no Tauri filesystem). */
+export function downloadInBrowser(file: { name: string; data: Uint8Array }): void {
+  const blob = new Blob([file.data as BlobPart], { type: "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = file.name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
