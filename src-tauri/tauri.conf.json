@@ -13,10 +13,11 @@
     "windows": [
       {
         "title": "DodoTabs",
-        "width": 1280,
+        "width": 1408,
         "height": 820,
         "minWidth": 760,
-        "minHeight": 560
+        "minHeight": 560,
+        "dragDropEnabled": true
       }
     ],
     "security": {

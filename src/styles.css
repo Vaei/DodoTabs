@@ -255,7 +255,7 @@ textarea {
   padding: 8px;
   display: grid;
   grid-template-columns: 1fr auto;
-  grid-template-rows: auto auto;
+  grid-template-rows: auto auto auto;
   gap: 6px 8px;
   opacity: 0.55;
   transition: opacity 0.15s, border-color 0.15s;
@@ -297,6 +297,21 @@ textarea {
   grid-column: 1 / -1;
   grid-row: 2;
   width: 100%;
+}
+.track__meter {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.track__meter-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: #36d17a;
+  transition: width 0.1s ease-out;
 }
 
 .tag {
@@ -499,9 +514,12 @@ textarea {
   transition: transform 0.18s ease;
 }
 .hotkeys__list {
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: auto auto;
   align-items: center;
-  gap: 16px;
+  column-gap: 16px;
+  row-gap: 3px;
   min-width: 0;
   overflow: hidden;
 }
@@ -706,6 +724,29 @@ textarea {
 .speedctl__menu button.on {
   color: var(--accent);
   font-weight: 600;
+}
+
+/* BPM (target tempo) field */
+.bpmctl {
+  width: 58px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--elevated);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  padding: 0 8px;
+  font-size: 13px;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.bpmctl:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.bpmctl::-webkit-outer-spin-button,
+.bpmctl::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* Selected-section (loop) chip */
@@ -952,6 +993,15 @@ textarea {
   color: var(--muted);
   font-size: 13px;
 }
+.settings-unit--wide {
+  min-width: 58px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.settings-row input[type="range"] {
+  width: 160px;
+  accent-color: var(--accent);
+}
 
 /* About dialog */
 .modal--about {
@@ -985,6 +1035,123 @@ textarea {
 }
 .about__link {
   width: 100%;
+}
+
+/* Tempo sync dialog */
+.modal--tempo {
+  width: min(460px, 100%);
+}
+.tempo-readout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.tempo-bpm {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--muted);
+}
+.tempo-bpm--locked {
+  color: var(--accent);
+}
+.tempo-bpm__value {
+  font-family: var(--font-display);
+  font-size: 48px;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.tempo-bpm__unit {
+  font-size: 14px;
+}
+.tempo-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.tempo-status--lg {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 4px 0 12px;
+}
+.tempo-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--border-strong);
+}
+.tempo-dot--on {
+  background: var(--accent);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.tempo-level {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  margin: 14px 0;
+}
+.tempo-level__fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.08s linear;
+}
+.tempo-listen {
+  width: 100%;
+  gap: 8px;
+}
+.tempo-error {
+  color: #ffd7db;
+}
+.tempo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.tempo-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+.tempo-grid__label {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.tempo-grid__value {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+.tempo-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.tempo-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.tempo-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
 }
 
 /* ---------- File menu (topbar dropdown) ---------- */
@@ -1068,6 +1235,28 @@ textarea {
   padding: 4px 10px 8px;
   font-size: 12px;
   color: var(--muted);
+}
+
+/* ---------- Drag & drop overlay ---------- */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  background: rgba(13, 15, 19, 0.7);
+  backdrop-filter: blur(2px);
+  pointer-events: none;
+}
+.drop-overlay__inner {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--accent);
+  border: 2px dashed var(--accent);
+  border-radius: 16px;
+  padding: 28px 44px;
+  background: var(--accent-soft);
 }
 
 /* ---------- Toast ---------- */

@@ -65,6 +65,10 @@ export default function TrackSidebar({ controller }: Props) {
               onChange={(e) => controller.setTrackVolume(t.index, Number(e.target.value))}
               title="Volume"
             />
+
+            <div className="track__meter" aria-hidden="true">
+              <div className="track__meter-fill" style={{ width: `${Math.round(t.activity * 100)}%` }} />
+            </div>
           </div>
         ))}
       </div>

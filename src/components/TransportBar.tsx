@@ -2,6 +2,7 @@ import { useCallback, useRef } from "react";
 import type { AlphaTabController } from "../lib/useAlphaTab";
 import { ZOOMS } from "../lib/constants";
 import SpeedControl from "./SpeedControl";
+import BpmControl from "./BpmControl";
 import { ChevronLeftIcon } from "./Icons";
 import {
   PlayIcon,
@@ -13,12 +14,17 @@ import {
   LayoutIcon,
   CloseIcon,
   BracketsIcon,
+  MicIcon,
 } from "./Icons";
 
 interface Props {
   controller: AlphaTabController;
   hotkeysVisible: boolean;
   onToggleHotkeys: () => void;
+  syncEnabled: boolean;
+  syncAvailable: boolean;
+  onToggleSync: () => void;
+  onOpenMic: () => void;
 }
 
 function formatTime(ms: number): string {
@@ -29,7 +35,15 @@ function formatTime(ms: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function TransportBar({ controller, hotkeysVisible, onToggleHotkeys }: Props) {
+export default function TransportBar({
+  controller,
+  hotkeysVisible,
+  onToggleHotkeys,
+  syncEnabled,
+  syncAvailable,
+  onToggleSync,
+  onOpenMic,
+}: Props) {
   const { state } = controller;
   const trackRef = useRef<HTMLDivElement>(null);
   const hkVisible = hotkeysVisible;
@@ -61,6 +75,21 @@ export default function TransportBar({ controller, hotkeysVisible, onToggleHotke
       <div className="transport__controls">
         <div className="transport__group">
           <button
+            className={`btn btn--wide ${syncEnabled && syncAvailable ? "btn--active" : ""}`}
+            onClick={() => (syncAvailable ? onToggleSync() : onOpenMic())}
+            title={
+              syncAvailable
+                ? "Sync to metronome: start playback (and each loop) on the beat"
+                : "Open the metronome mic dialog and start listening"
+            }
+          >
+            <MicIcon width={16} height={16} />
+            <span>Sync</span>
+          </button>
+        </div>
+
+        <div className="transport__group">
+          <button
             className="btn btn--primary"
             onClick={controller.playPause}
             disabled={disabled}
@@ -90,7 +119,7 @@ export default function TransportBar({ controller, hotkeysVisible, onToggleHotke
             className={`btn ${state.metronome ? "btn--active" : ""}`}
             onClick={controller.toggleMetronome}
             disabled={disabled}
-            title="Metronome"
+            title="Metronome (M)"
           >
             <MetronomeIcon />
           </button>
@@ -165,6 +194,9 @@ export default function TransportBar({ controller, hotkeysVisible, onToggleHotke
               <span>
                 <kbd>Z</kbd> Count-in
               </span>
+              <span>
+                <kbd>M</kbd> Metronome
+              </span>
               <span title="Shift+A / Shift+D - skip back / forward by seconds">
                 <kbd>A</kbd>/<kbd>D</kbd> Bar
               </span>
@@ -174,6 +206,9 @@ export default function TransportBar({ controller, hotkeysVisible, onToggleHotke
               <span>
                 <kbd>Shift</kbd>+Scroll Zoom
               </span>
+              <span>
+                <kbd>Alt</kbd>+Scroll BPM
+              </span>
             </div>
           )}
         </div>
@@ -181,7 +216,22 @@ export default function TransportBar({ controller, hotkeysVisible, onToggleHotke
         <div className="transport__group transport__group--selects">
           <SpeedControl value={state.speed} disabled={disabled} onChange={controller.setSpeed} />
 
-          <label className="select">
+          <BpmControl
+            value={state.tempo > 0 ? Math.round(state.tempo * state.speed) : 0}
+            resetTo={state.tempo}
+            disabled={disabled || state.tempo <= 0}
+            onChange={controller.setBpm}
+          />
+
+          <label
+            className="select"
+            onMouseDown={(e) => {
+              if (e.button === 1) {
+                e.preventDefault();
+                controller.setZoom(1); // middle-click resets to 100%
+              }
+            }}
+          >
             <span>Zoom</span>
             <select
               value={state.zoom}

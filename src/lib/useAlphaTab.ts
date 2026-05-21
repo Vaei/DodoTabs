@@ -16,6 +16,7 @@ export interface TrackInfo {
   soloed: boolean;
   volume: number; // 0..1
   rendered: boolean;
+  activity: number; // 0..1 live playback level (which track is sounding now)
 }
 
 export interface AlphaTabState {
@@ -23,6 +24,7 @@ export interface AlphaTabState {
   scoreLoaded: boolean;
   title: string;
   artist: string;
+  tempo: number; // song's base tempo in BPM (0 until a score is loaded)
   tracks: TrackInfo[];
   playing: boolean;
   currentTime: number; // ms
@@ -49,6 +51,7 @@ const initialState: AlphaTabState = {
   scoreLoaded: false,
   title: "",
   artist: "",
+  tempo: 0,
   tracks: [],
   playing: false,
   currentTime: 0,
@@ -73,12 +76,14 @@ export interface AlphaTabController {
   containerRef: React.RefObject<HTMLDivElement>;
   viewportRef: React.RefObject<HTMLDivElement>;
   loadFile: (file: LoadedFile) => void;
+  play: () => void;
   playPause: () => void;
   stop: () => void;
   seekToRatio: (ratio: number) => void;
   skip: (seconds: number) => void;
   stepBar: (dir: -1 | 1) => void;
   setSpeed: (speed: number) => void;
+  setBpm: (bpm: number) => void;
   toggleLoop: () => void;
   clearSelection: () => void;
   toggleSnapToBar: () => void;
@@ -92,6 +97,8 @@ export interface AlphaTabController {
   setTrackSolo: (index: number, soloed: boolean) => void;
   setTrackVolume: (index: number, volume: number) => void;
   renderTracks: (indexes: number[]) => void;
+  setPlayScheduler: (fn: (doPlay: () => void) => void) => void;
+  setSyncLoop: (enabled: boolean) => void;
 }
 
 export function useAlphaTab(): AlphaTabController {
@@ -109,16 +116,32 @@ export function useAlphaTab(): AlphaTabController {
   // Count-in mode + whether a section is selected, for the manual loop count-in.
   const countInModeRef = useRef<0 | 1 | 2>(0);
   const hasSelectionRef = useRef(false);
+  const playingRef = useRef(false);
+  // Live per-track activity levels (track index -> 0..1), peaked on note onsets
+  // and decayed by a timer for a bouncing-meter look. Driven from the audio
+  // timeline across ALL tracks (not just rendered ones).
+  const activityRef = useRef<Map<number, number>>(new Map());
+  const allTrackIdsRef = useRef<Set<number>>(new Set());
+  const lastBeatIdRef = useRef<Map<number, number>>(new Map());
+  const findHintRef = useRef<unknown>(null);
+  // Metronome-sync: when on, plays/loop-restarts are deferred to the next beat.
+  const syncLoopRef = useRef(false);
+  // Wraps a "start playback" so App can delay it to the next metronome beat.
+  const playSchedulerRef = useRef<(doPlay: () => void) => void>((doPlay) => doPlay());
 
   const patch = useCallback((p: Partial<AlphaTabState>) => {
     setState((s) => ({ ...s, ...p }));
   }, []);
 
-  // Native looping is used for modes 0/1 (seamless). For mode 2 we loop manually
-  // (see playerFinished) so a count-in can play before each repeat.
+  // Native (seamless) looping is used only for modes 0/1 with sync off. For count-in
+  // mode 2, or when metronome-sync is on, we loop manually (see playerFinished) so a
+  // count-in / beat-aligned restart can happen.
   const applyLooping = useCallback(() => {
     const api = apiRef.current;
-    if (api) api.isLooping = loopingRef.current && countInModeRef.current !== 2;
+    if (api) {
+      api.isLooping =
+        loopingRef.current && countInModeRef.current !== 2 && !syncLoopRef.current;
+    }
   }, []);
 
   useEffect(() => {
@@ -159,15 +182,25 @@ export function useAlphaTab(): AlphaTabController {
         soloed: false,
         volume: 1,
         rendered: true,
+        activity: 0,
       }));
       autoLoopRef.current = false;
+      // Track every track index (the audio plays them all) for the activity meters.
+      allTrackIdsRef.current = new Set((score?.tracks ?? []).map((t) => t.index));
+      lastBeatIdRef.current.clear();
+      findHintRef.current = null;
+      activityRef.current.clear();
+      // Reset playback speed to 1.0x (BPM defaults to the tab's tempo).
+      api.playbackSpeed = 1;
       patch({
         scoreLoaded: !!score,
         title: score?.title ?? "",
         artist: score?.artist ?? "",
+        tempo: score?.tempo ?? 0,
         tracks,
         currentTime: 0,
         currentTick: 0,
+        speed: 1,
         hasSelection: false,
       });
     });
@@ -224,8 +257,23 @@ export function useAlphaTab(): AlphaTabController {
     api.renderFinished.on(() => patch({ rendering: false }));
 
     api.playerStateChanged.on((e) => {
-      patch({ playing: e.state === alphaTab.synth.PlayerState.Playing });
+      const playing = e.state === alphaTab.synth.PlayerState.Playing;
+      playingRef.current = playing;
+      if (!playing) {
+        // Clear the live activity meters when playback isn't running.
+        activityRef.current.clear();
+        setState((s) => ({
+          ...s,
+          playing,
+          tracks: s.tracks.some((t) => t.activity !== 0)
+            ? s.tracks.map((t) => ({ ...t, activity: 0 }))
+            : s.tracks,
+        }));
+      } else {
+        patch({ playing });
+      }
     });
+
 
     api.playerPositionChanged.on((e) => {
       patch({
@@ -234,24 +282,63 @@ export function useAlphaTab(): AlphaTabController {
         currentTick: e.currentTick,
         endTick: e.endTick,
       });
+
+      // Activity meters: look up the beats sounding NOW across all tracks (the
+      // audio plays every track, not just the rendered ones) and peak each track's
+      // meter on a new beat onset (skip rests / empty beats).
+      const cache = api.tickCache;
+      const all = allTrackIdsRef.current;
+      if (!cache || all.size === 0) return;
+      const res = cache.findBeat(
+        all,
+        e.currentTick,
+        findHintRef.current as Parameters<typeof cache.findBeat>[2]
+      );
+      findHintRef.current = res;
+      if (!res) return;
+      const m = activityRef.current;
+      const last = lastBeatIdRef.current;
+      for (const item of res.beatLookup.highlightedBeats) {
+        const beat = item.beat;
+        if (!beat || beat.isRest || !beat.notes || beat.notes.length === 0) continue;
+        const ti = beat.voice?.bar?.staff?.track?.index;
+        if (ti == null) continue;
+        if (last.get(ti) !== beat.id) {
+          last.set(ti, beat.id);
+          const d = Math.min(beat.dynamics ?? 5, 7);
+          const lvl = Math.max(0.3, Math.min(1, (d + 1) / 8));
+          m.set(ti, Math.max(m.get(ti) ?? 0, lvl));
+        }
+      }
     });
 
     api.soundFontLoaded.on(() => patch({ soundFontReady: true }));
 
-    // Mode 2: re-arm the section loop with a count-in each time it finishes.
-    // stop() parks the cursor at the range start, but its cursor placement runs on the
-    // next animation frame - so we must let that frame run (while still Paused) before
-    // play() flips the state to Playing, otherwise the cursor animates during the count-in.
+    // Manual loop restart, used for count-in-per-loop (mode 2) and/or metronome-sync.
+    // The restart goes through the play scheduler so it can be aligned to the next beat.
+    // A count-in plays only in mode 2; for modes 0/1 we suppress it on the restart.
     api.playerFinished.on(() => {
-      if (
-        loopingRef.current &&
-        countInModeRef.current === 2 &&
-        hasSelectionRef.current &&
-        api.playbackRange
-      ) {
-        api.stop();
-        requestAnimationFrame(() => apiRef.current?.play());
-      }
+      if (!loopingRef.current) return;
+      if (countInModeRef.current !== 2 && !syncLoopRef.current) return;
+      playSchedulerRef.current(() => {
+        const a = apiRef.current;
+        if (!a) return;
+        a.stop();
+        // stop() places the cursor on the next animation frame; let it settle (while
+        // Paused) before play() flips to Playing, else the cursor animates during count-in.
+        requestAnimationFrame(() => {
+          const a2 = apiRef.current;
+          if (!a2) return;
+          if (countInModeRef.current === 2) {
+            a2.play();
+          } else {
+            const v = a2.countInVolume;
+            a2.countInVolume = 0;
+            a2.play();
+            a2.countInVolume = v;
+          }
+        });
+      });
     });
 
     // Re-apply a previously chosen audio output device once the player is ready.
@@ -278,13 +365,61 @@ export function useAlphaTab(): AlphaTabController {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Drive the per-track activity meters while playing: render the current peaks,
+  // then decay them so each meter bounces and falls back after a note.
+  useEffect(() => {
+    if (!state.playing) return;
+    const id = window.setInterval(() => {
+      const m = activityRef.current;
+      setState((s) => {
+        const anySolo = s.tracks.some((t) => t.soloed);
+        let changed = false;
+        const tracks = s.tracks.map((t) => {
+          let a = m.get(t.index) ?? 0;
+          if (t.muted || (anySolo && !t.soloed)) a = 0;
+          if (Math.abs(a - t.activity) > 0.001) {
+            changed = true;
+            return { ...t, activity: a };
+          }
+          return t;
+        });
+        return changed ? { ...s, tracks } : s;
+      });
+      // Decay for the next tick.
+      for (const [k, v] of m) {
+        const nv = v <= 0.04 ? 0 : v * 0.8;
+        if (nv === 0) m.delete(k);
+        else m.set(k, nv);
+      }
+    }, 45);
+    return () => clearInterval(id);
+  }, [state.playing]);
+
   const loadFile = useCallback((file: LoadedFile) => {
     patch({ error: null });
     apiRef.current?.load(file.data);
   }, [patch]);
 
-  const playPause = useCallback(() => apiRef.current?.playPause(), []);
+  // Starting playback goes through the scheduler (so metronome-sync can delay it to
+  // the next beat); pausing is always immediate.
+  const play = useCallback(() => {
+    playSchedulerRef.current(() => apiRef.current?.play());
+  }, []);
+  const playPause = useCallback(() => {
+    if (playingRef.current) apiRef.current?.playPause();
+    else playSchedulerRef.current(() => apiRef.current?.playPause());
+  }, []);
   const stop = useCallback(() => apiRef.current?.stop(), []);
+
+  const setPlayScheduler = useCallback((fn: (doPlay: () => void) => void) => {
+    playSchedulerRef.current = fn;
+  }, []);
+
+  // Enable/disable beat-aligned looping (App turns this on when sync mode + listening).
+  const setSyncLoop = useCallback((enabled: boolean) => {
+    syncLoopRef.current = enabled;
+    applyLooping();
+  }, [applyLooping]);
 
   const seekToRatio = useCallback((ratio: number) => {
     const api = apiRef.current;
@@ -326,9 +461,16 @@ export function useAlphaTab(): AlphaTabController {
   }, []);
 
   const setSpeed = useCallback((speed: number) => {
-    if (apiRef.current) apiRef.current.playbackSpeed = speed;
-    patch({ speed });
+    const clamped = Math.max(0.125, Math.min(8, speed));
+    if (apiRef.current) apiRef.current.playbackSpeed = clamped;
+    patch({ speed: clamped });
   }, [patch]);
+
+  // BPM is a view over the speed: speed = targetBpm / songTempo.
+  const setBpm = useCallback((bpm: number) => {
+    const base = apiRef.current?.score?.tempo ?? 0;
+    if (base > 0) setSpeed(bpm / base);
+  }, [setSpeed]);
 
   const toggleLoop = useCallback(() => {
     setState((s) => {
@@ -472,12 +614,14 @@ export function useAlphaTab(): AlphaTabController {
     containerRef,
     viewportRef,
     loadFile,
+    play,
     playPause,
     stop,
     seekToRatio,
     skip,
     stepBar,
     setSpeed,
+    setBpm,
     toggleLoop,
     clearSelection,
     toggleSnapToBar,
@@ -491,5 +635,7 @@ export function useAlphaTab(): AlphaTabController {
     setTrackSolo,
     setTrackVolume,
     renderTracks,
+    setPlayScheduler,
+    setSyncLoop,
   };
 }

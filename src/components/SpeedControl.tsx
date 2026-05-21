@@ -42,7 +42,15 @@ export default function SpeedControl({ value, disabled, onChange }: Props) {
   };
 
   return (
-    <label className="select speedctl-wrap">
+    <label
+      className="select speedctl-wrap"
+      onMouseDown={(e) => {
+        if (e.button === 1) {
+          e.preventDefault();
+          onChange(1); // middle-click resets to 1.0x
+        }
+      }}
+    >
       <span>Speed</span>
       <div className={`speedctl ${disabled ? "speedctl--disabled" : ""}`} ref={ref}>
         <input

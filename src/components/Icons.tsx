@@ -118,6 +118,15 @@ export const CloseIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const MicIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="9" y="2" width="6" height="12" rx="3" />
+    <path d="M5 11a7 7 0 0 0 14 0" />
+    <line x1="12" y1="18" x2="12" y2="22" />
+    <line x1="8" y1="22" x2="16" y2="22" />
+  </Svg>
+);
+
 export const ExternalLinkIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />

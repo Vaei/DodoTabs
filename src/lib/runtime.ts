@@ -40,6 +40,28 @@ function inTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
+export function isTauriRuntime(): boolean {
+  return inTauri();
+}
+
+/** True if the filename has a supported tab extension. */
+export function isSupportedTabFile(name: string): boolean {
+  const lower = name.toLowerCase();
+  return SUPPORTED_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+
+/** Build a LoadedFile from an absolute path (Tauri drag-drop / dialog). */
+export async function fileFromPath(path: string): Promise<LoadedFile> {
+  const data = await readTauriFile(path);
+  return { name: basename(path), data, source: { kind: "localPath", path } };
+}
+
+/** Build a LoadedFile from a browser File (HTML5 drag-drop / input). */
+export async function fileFromDomFile(file: File): Promise<LoadedFile> {
+  const buffer = await file.arrayBuffer();
+  return { name: file.name, data: new Uint8Array(buffer), source: { kind: "browser" } };
+}
+
 // Tauri reports the OS; only desktop platforms host the LAN server.
 let cachedIsDesktopHost: boolean | null = null;
 
