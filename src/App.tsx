@@ -310,7 +310,7 @@ export default function App() {
             onClear={clearRecents}
           />
         </aside>
-        <ScoreView controller={controller} />
+        <ScoreView controller={controller} onOpenFile={quickOpen} />
       </div>
 
       <TransportBar

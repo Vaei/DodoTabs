@@ -381,7 +381,17 @@ textarea {
   inset: 0;
   display: grid;
   place-items: center;
-  pointer-events: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  transition: background 0.15s ease;
+}
+.score-empty:hover {
+  background: var(--elevated);
+}
+.score-empty:hover .score-empty__inner h2 {
+  color: var(--accent);
 }
 .score-empty__inner {
   text-align: center;

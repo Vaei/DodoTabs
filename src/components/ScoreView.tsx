@@ -2,13 +2,14 @@ import type { AlphaTabController } from "../lib/useAlphaTab";
 
 interface Props {
   controller: AlphaTabController;
+  onOpenFile: () => void;
 }
 
 /**
  * The score area. The outer `.score-viewport` is the scroll element handed to
  * alphaTab (player.scrollElement); alphaTab renders into the inner `.score-surface`.
  */
-export default function ScoreView({ controller }: Props) {
+export default function ScoreView({ controller, onOpenFile }: Props) {
   const { state, containerRef, viewportRef } = controller;
 
   return (
@@ -18,12 +19,17 @@ export default function ScoreView({ controller }: Props) {
       </div>
 
       {!state.scoreLoaded && (
-        <div className="score-empty">
+        <button
+          type="button"
+          className="score-empty"
+          onClick={onOpenFile}
+          title="Open a tab file"
+        >
           <div className="score-empty__inner">
             <h2>No tab loaded</h2>
-            <p>Open a Guitar Pro / MusicXML file, or connect to a tab library on your network.</p>
+            <p>Click here to open a Guitar Pro / MusicXML file, or connect to a tab library on your network.</p>
           </div>
-        </div>
+        </button>
       )}
 
       {state.rendering && state.scoreLoaded && (
