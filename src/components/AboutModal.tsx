@@ -6,7 +6,13 @@ import {
   GITHUB_URL,
   THIRD_PARTY_LICENSES,
 } from "../lib/constants";
-import { checkForUpdates, isDesktopHost, openExternal } from "../lib/runtime";
+import {
+  checkForUpdates,
+  isDesktopHost,
+  isLikelyMobile,
+  latestReleaseIfNewer,
+  openExternal,
+} from "../lib/runtime";
 import { CloseIcon, ExternalLinkIcon, ChevronLeftIcon, DownloadIcon } from "./Icons";
 
 interface Props {
@@ -23,11 +29,24 @@ export default function AboutModal({ onClose }: Props) {
     isDesktopHost().then(setDesktop);
   }, []);
 
+  const mobile = isLikelyMobile();
+
   const onCheckUpdates = async () => {
     setChecking(true);
     setUpdateStatus(null);
     try {
-      setUpdateStatus(await checkForUpdates());
+      if (mobile) {
+        // Android has no auto-updater: check GitHub and open the release to download.
+        const update = await latestReleaseIfNewer(APP_VERSION);
+        if (update) {
+          setUpdateStatus(`Version ${update.version} available - opening download`);
+          openExternal(update.url);
+        } else {
+          setUpdateStatus("You're on the latest version.");
+        }
+      } else {
+        setUpdateStatus(await checkForUpdates());
+      }
     } catch {
       setUpdateStatus("Couldn't check for updates right now.");
     } finally {
@@ -102,12 +121,17 @@ export default function AboutModal({ onClose }: Props) {
               </div>
             </button>
 
-            {desktop && (
+            {(desktop || mobile) && (
               <button className="row-action" onClick={onCheckUpdates} disabled={checking}>
                 <DownloadIcon />
                 <div>
                   <strong>{checking ? "Checking..." : "Check for updates"}</strong>
-                  <span>{updateStatus ?? "See if a newer version is available"}</span>
+                  <span>
+                    {updateStatus ??
+                      (mobile
+                        ? "See if a newer APK is available on GitHub"
+                        : "See if a newer version is available")}
+                  </span>
                 </div>
               </button>
             )}

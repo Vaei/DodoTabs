@@ -4,6 +4,7 @@
 //  - Plain browser (Firefox): a client.
 //
 // `isDesktopHost()` gates the host-only features (native dialogs, fs, the LAN server).
+import { GITHUB_URL } from "./constants";
 
 // Where a tab came from. Only `localPath` and `remote` can be reopened later
 // (used for the recent-files list); `browser` file-input picks are not reopenable.
@@ -294,6 +295,32 @@ export async function checkForUpdates(): Promise<string> {
   const { relaunch } = await import("@tauri-apps/plugin-process");
   await relaunch();
   return "Restarting to finish the update...";
+}
+
+function versionIsNewer(remote: string, local: string): boolean {
+  const r = remote.split(".").map((n) => parseInt(n, 10) || 0);
+  const l = local.split(".").map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(r.length, l.length); i++) {
+    const a = r[i] ?? 0;
+    const b = l[i] ?? 0;
+    if (a !== b) return a > b;
+  }
+  return false;
+}
+
+/** Compares the running version to the latest GitHub release (used on Android,
+ * which has no auto-updater). Returns the newer release's version + page URL, or
+ * null if already up to date. */
+export async function latestReleaseIfNewer(
+  current: string
+): Promise<{ version: string; url: string } | null> {
+  const api = `${GITHUB_URL.replace("https://github.com/", "https://api.github.com/repos/")}/releases/latest`;
+  const res = await fetch(api, { headers: { Accept: "application/vnd.github+json" } });
+  if (!res.ok) throw new Error(`GitHub ${res.status}`);
+  const data = (await res.json()) as { tag_name?: string; html_url?: string };
+  const version = (data.tag_name ?? "").replace(/^v/, "");
+  if (!version || !versionIsNewer(version, current)) return null;
+  return { version, url: data.html_url ?? `${GITHUB_URL}/releases/latest` };
 }
 
 /** Native yes/no confirmation dialog. Returns true if the user confirms. */
