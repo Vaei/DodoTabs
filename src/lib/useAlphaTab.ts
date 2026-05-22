@@ -222,30 +222,38 @@ export function useAlphaTab(): AlphaTabController {
   const startWithCountIn = useCallback((start: () => void) => {
     countInCancelRef.current?.(); // cancel any prior in-progress count-in
     const api = apiRef.current;
-    const fullSpeed = (localStorage.getItem(COUNT_IN_FULL_SPEED_KEY) ?? "1") !== "0";
-    if (!api || !fullSpeed || countInModeRef.current === 0 || api.playbackSpeed === 1) {
+    if (!api) {
       start();
       return;
     }
+    const mode = countInModeRef.current;
+    const fullSpeed = (localStorage.getItem(COUNT_IN_FULL_SPEED_KEY) ?? "1") !== "0";
     const bars = api.score?.masterBars;
     const tempo = api.score?.tempo ?? 0;
-    if (!bars || bars.length === 0 || tempo <= 0) {
+    const useCustom =
+      fullSpeed && mode > 0 && api.playbackSpeed !== 1 && !!bars && bars.length > 0 && tempo > 0;
+
+    if (!useCustom || !bars) {
+      // Use alphaTab's own count-in; (re-)set its volume to match the mode in case a
+      // prior custom count-in left it muted.
+      api.countInVolume = mode > 0 ? 1 : 0;
       start();
       return;
     }
+
     const tick = api.tickPosition;
     let i = 0;
     while (i + 1 < bars.length && bars[i + 1].start <= tick) i++;
     const barEnd = i + 1 < bars.length ? bars[i + 1].start : api.endTick;
     const beats = bars[i].timeSignatureNumerator || 4;
-    const barMs = ((barEnd - bars[i].start) / 960) * (60000 / tempo); // 960 ticks/quarter
-    const intervalMs = barMs / beats;
+    const intervalMs = (((barEnd - bars[i].start) / 960) * (60000 / tempo)) / beats;
 
-    const savedCountIn = api.countInVolume;
-    api.countInVolume = 0; // our clicks replace alphaTab's count-in for this start
+    // Keep alphaTab's count-in muted for this start (our clicks are the count-in); the
+    // next non-custom start re-enables it. Restoring it before start() would make
+    // alphaTab add its own slow count-in on top of ours.
+    api.countInVolume = 0;
     const finish = (play: boolean) => {
       countInCancelRef.current = null;
-      if (apiRef.current) apiRef.current.countInVolume = savedCountIn;
       if (play) start();
     };
     const cancelClicks = playCountIn(beats, intervalMs, () => finish(true));
