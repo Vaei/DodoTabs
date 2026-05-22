@@ -918,7 +918,7 @@ dependencies = [
 
 [[package]]
 name = "dodotabs"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "axum",
  "local-ip-address",

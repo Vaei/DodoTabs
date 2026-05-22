@@ -183,5 +183,18 @@ Bravura, Inter and Space Grotesk fonts (SIL OFL-1.1), and the Tauri/React stack
 
 ## Changelog
 
+### 1.0.2
+* Landscape: tracks panel open by default and no longer dims the score
+* Landscape: smaller floating playback controls
+* Clearer message when an update fails
+
+### 1.0.1
+* Keep the screen awake while playing (phone)
+* Count-in can ignore the playback speed (setting)
+* Fixed selecting the audio output device on Windows
+* Check for updates from the About screen on Android
+* Fixed a loop selection lingering after switching songs
+* Metronome-sync and count-in fixes
+
 ### 1.0.0
 * Initial Release
