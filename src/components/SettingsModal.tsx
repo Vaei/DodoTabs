@@ -269,7 +269,8 @@ export default function SettingsModal({
             </button>
           )}
           <p className="settings-note">
-            Used by an upcoming feature that listens for a physical metronome in the room.
+            Used to listen for a physical metronome in the room, to start playback in time
+            with it.
           </p>
         </section>
       </div>
