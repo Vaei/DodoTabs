@@ -1583,27 +1583,28 @@ body.is-mobile textarea {
   }
 }
 @media (orientation: landscape) {
+  /* In-flow side panel: shown open by default, collapses to just the handle to free
+     up score width. No overlay/scrim, so the score is never dimmed or tap-closed. */
   .tracks-drawer {
-    position: fixed;
-    top: var(--top-handle-h);
-    left: 0;
-    bottom: 0;
-    z-index: 44;
+    flex: 0 0 auto;
     display: flex;
     flex-direction: row;
-    transform: translateX(calc(-100% + var(--tracks-handle-w)));
-    transition: transform 0.24s ease;
-  }
-  .tracks-drawer--open {
-    transform: translateX(0);
+    min-height: 0;
+    overflow: hidden;
   }
   .tracks-drawer__body {
     width: 210px;
+    overflow-y: auto;
     background: var(--panel);
     border-right: 1px solid var(--border);
-    overflow-y: auto;
+    transition: width 0.24s ease;
     /* Clear the collapsed bottom drawer so the last track can scroll into view. */
     padding-bottom: calc(var(--handle-h) + env(safe-area-inset-bottom) + 16px);
+  }
+  .tracks-drawer:not(.tracks-drawer--open) .tracks-drawer__body {
+    width: 0;
+    overflow: hidden;
+    border-right: none;
   }
   .tracks-drawer__handle {
     flex: 0 0 auto;
@@ -1613,10 +1614,9 @@ body.is-mobile textarea {
     justify-content: center;
     background: var(--panel);
     border: none;
-    border-radius: 0 12px 12px 0;
+    border-right: 1px solid var(--border);
     color: var(--muted);
     cursor: pointer;
-    box-shadow: var(--shadow);
   }
   .tracks-drawer__label {
     writing-mode: vertical-rl;
@@ -1624,11 +1624,6 @@ body.is-mobile textarea {
     font-size: 12px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-  }
-  .drawer-scrim--tracks {
-    z-index: 43;
-    /* Don't dim the score while the tracks drawer is open; still tap-to-close. */
-    background: transparent;
   }
 
   /* Landscape is short: shrink the floating controls and trim the score's

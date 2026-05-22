@@ -8,33 +8,27 @@ interface Props {
 }
 
 // Tracks panel. In portrait this renders as a static horizontal strip (CSS); in
-// landscape it becomes a left-edge drawer with a grab handle, opened by tap or
-// swipe. Separate from the Recents pop-out. Hidden entirely when no tab is loaded.
+// landscape it's an in-flow side panel shown open by default, collapsible via its
+// handle (tap or swipe) to give the score more width. Hidden when no tab is loaded.
 export default function TracksDrawer({ controller }: Props) {
-  const [open, setOpen] = useState(false);
+  // Open by default so the tracks are visible in landscape without a tap.
+  const [open, setOpen] = useState(true);
   const handle = useDrawerHandle(open, setOpen, "left");
 
   if (!controller.state.scoreLoaded) return null;
 
   return (
-    <>
-      <div
-        className={`drawer-scrim drawer-scrim--tracks ${open ? "drawer-scrim--show" : ""}`}
-        onClick={() => setOpen(false)}
-        aria-hidden="true"
-      />
-      <div className={`tracks-drawer ${open ? "tracks-drawer--open" : ""}`}>
-        <div className="tracks-drawer__body">
-          <TrackSidebar controller={controller} />
-        </div>
-        <button
-          className="tracks-drawer__handle"
-          {...handle}
-          aria-label={open ? "Hide tracks" : "Show tracks"}
-        >
-          <span className="tracks-drawer__label">Tracks</span>
-        </button>
+    <div className={`tracks-drawer ${open ? "tracks-drawer--open" : ""}`}>
+      <div className="tracks-drawer__body">
+        <TrackSidebar controller={controller} />
       </div>
-    </>
+      <button
+        className="tracks-drawer__handle"
+        {...handle}
+        aria-label={open ? "Hide tracks" : "Show tracks"}
+      >
+        <span className="tracks-drawer__label">Tracks</span>
+      </button>
+    </div>
   );
 }
