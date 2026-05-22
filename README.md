@@ -15,6 +15,13 @@ DodoTabs plays structured tab files (Guitar Pro, MusicXML, Capella, AlphaTex), n
 text tabs. To read your tabs on other devices, the desktop app can serve a folder of tab
 files over Wi-Fi: grab them on your computer, then browse and play them on your phone.
 
+## Features
+
+* Windows + Android support
+* Share tab files between devices
+* Sync playback with physical metronome
+* BPM based speed scaling
+
 ## Project layout
 
 ```
