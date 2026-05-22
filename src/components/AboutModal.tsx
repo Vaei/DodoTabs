@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   APP_AUTHOR,
   APP_LICENSE,
@@ -6,8 +6,8 @@ import {
   GITHUB_URL,
   THIRD_PARTY_LICENSES,
 } from "../lib/constants";
-import { openExternal } from "../lib/runtime";
-import { CloseIcon, ExternalLinkIcon, ChevronLeftIcon } from "./Icons";
+import { checkForUpdates, isDesktopHost, openExternal } from "../lib/runtime";
+import { CloseIcon, ExternalLinkIcon, ChevronLeftIcon, DownloadIcon } from "./Icons";
 
 interface Props {
   onClose: () => void;
@@ -15,6 +15,25 @@ interface Props {
 
 export default function AboutModal({ onClose }: Props) {
   const [showLicenses, setShowLicenses] = useState(false);
+  const [desktop, setDesktop] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  useEffect(() => {
+    isDesktopHost().then(setDesktop);
+  }, []);
+
+  const onCheckUpdates = async () => {
+    setChecking(true);
+    setUpdateStatus(null);
+    try {
+      setUpdateStatus(await checkForUpdates());
+    } catch {
+      setUpdateStatus("Couldn't check for updates right now.");
+    } finally {
+      setChecking(false);
+    }
+  };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -82,6 +101,16 @@ export default function AboutModal({ onClose }: Props) {
                 <span>The components DodoTabs is built on</span>
               </div>
             </button>
+
+            {desktop && (
+              <button className="row-action" onClick={onCheckUpdates} disabled={checking}>
+                <DownloadIcon />
+                <div>
+                  <strong>{checking ? "Checking..." : "Check for updates"}</strong>
+                  <span>{updateStatus ?? "See if a newer version is available"}</span>
+                </div>
+              </button>
+            )}
           </div>
         )}
       </div>

@@ -1,6 +1,6 @@
 [package]
 name = "dodotabs"
-version = "1.0.0-beta"
+version = "1.0.0"
 description = "Guitar tab player powered by alphaTab"
 authors = ["DodoTabs"]
 edition = "2021"
@@ -28,3 +28,8 @@ tower-http = { version = "0.6", features = ["cors"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "fs"] }
 walkdir = "2"
 local-ip-address = "0.6"
+
+# Auto-updater (desktop only; mobile updates are distributed manually / via stores).
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"

@@ -265,6 +265,26 @@ export async function deleteLocalTab(dir: string, rel: string): Promise<void> {
   await invoke("delete_local_tab", { dir, path: rel });
 }
 
+/** Desktop only: check for a newer release and, if the user agrees, install + relaunch.
+ * Returns a short status string to show the user. */
+export async function checkForUpdates(): Promise<string> {
+  const { check } = await import("@tauri-apps/plugin-updater");
+  const update = await check();
+  if (!update) return "You're on the latest version.";
+  const { ask } = await import("@tauri-apps/plugin-dialog");
+  const ok = await ask(`DodoTabs ${update.version} is available. Download and install now?`, {
+    title: "Update available",
+    kind: "info",
+    okLabel: "Update",
+    cancelLabel: "Later",
+  });
+  if (!ok) return `Version ${update.version} is available.`;
+  await update.downloadAndInstall();
+  const { relaunch } = await import("@tauri-apps/plugin-process");
+  await relaunch();
+  return "Restarting to finish the update...";
+}
+
 /** Native yes/no confirmation dialog. Returns true if the user confirms. */
 export async function confirmDelete(name: string): Promise<boolean> {
   const { confirm } = await import("@tauri-apps/plugin-dialog");

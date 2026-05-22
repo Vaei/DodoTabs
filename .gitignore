@@ -34,6 +34,15 @@ src-tauri/gen/schemas/
 # Source-image used to generate the icon set (icons/ is committed)
 src-tauri/icon-source.png
 
+# ---- Signing secrets (NEVER commit; back these up separately) ----
+# Tauri updater private key (public key lives in tauri.conf.json)
+src-tauri/updater_key
+src-tauri/updater_key.pub
+# Android release keystore + its credentials
+*.jks
+*.keystore
+src-tauri/gen/android/key.properties
+
 # ---- Editors / IDEs ----
 .vscode/*
 !.vscode/extensions.json
