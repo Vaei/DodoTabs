@@ -564,7 +564,14 @@ export function useAlphaTab(): AlphaTabController {
 
   const loadFile = useCallback((file: LoadedFile) => {
     patch({ error: null });
-    apiRef.current?.load(file.data);
+    // Clear any section loop from the current song before swapping in the new one, so
+    // its selection highlight doesn't linger on the next score.
+    const api = apiRef.current;
+    if (api) {
+      api.playbackRange = null;
+      api.isLooping = false;
+    }
+    api?.load(file.data);
   }, [patch]);
 
   // Starting playback goes through the scheduler (so metronome-sync can delay it to
