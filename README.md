@@ -180,3 +180,8 @@ DodoTabs is licensed under the [GNU AGPL-3.0](LICENSE). It bundles third-party c
 under their own licenses: alphaTab (MPL-2.0), the Sonivox EAS soundfont (Apache-2.0), the
 Bravura, Inter and Space Grotesk fonts (SIL OFL-1.1), and the Tauri/React stack
 (MIT/Apache-2.0). The full list is in the in-app **About -> Licenses** screen.
+
+## Changelog
+
+### 1.0.0
+* Initial Release
