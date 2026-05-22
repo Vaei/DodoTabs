@@ -7,12 +7,21 @@ interface Props {
   recents: RecentEntry[];
   activeKey: string | null;
   onOpen: (entry: RecentEntry) => void;
+  onRemove: (entry: RecentEntry) => void;
   onClear: () => void;
 }
 
 // Slide-in drawer holding the recent-files list. On landscape it overlays the
 // fixed Tracks column; on portrait it covers the left edge of the score.
-export default function LeftDrawer({ open, onClose, recents, activeKey, onOpen, onClear }: Props) {
+export default function LeftDrawer({
+  open,
+  onClose,
+  recents,
+  activeKey,
+  onOpen,
+  onRemove,
+  onClear,
+}: Props) {
   return (
     <>
       <div
@@ -28,6 +37,7 @@ export default function LeftDrawer({ open, onClose, recents, activeKey, onOpen, 
             onOpen(entry);
             onClose();
           }}
+          onRemove={onRemove}
           onClear={onClear}
         />
       </aside>

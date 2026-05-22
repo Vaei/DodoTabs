@@ -54,6 +54,14 @@ export function addRecent(file: LoadedFile): RecentEntry[] {
   return next.slice(0, MAX);
 }
 
+/** Removes a single entry (matched by source) from the recents list. */
+export function removeRecent(entry: RecentEntry): RecentEntry[] {
+  const key = sourceKey(entry.source);
+  const next = loadRecents().filter((e) => sourceKey(e.source) !== key);
+  save(next);
+  return next;
+}
+
 export function clearRecents(): RecentEntry[] {
   try {
     localStorage.removeItem(KEY);

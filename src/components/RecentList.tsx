@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import type { RecentEntry } from "../lib/recents";
 import { FileIcon, NetworkIcon, TrashIcon } from "./Icons";
 
@@ -5,6 +6,7 @@ interface Props {
   recents: RecentEntry[];
   activeKey: string | null;
   onOpen: (entry: RecentEntry) => void;
+  onRemove: (entry: RecentEntry) => void;
   onClear: () => void;
 }
 
@@ -18,7 +20,33 @@ function subtitle(e: RecentEntry): string {
   return e.source.kind === "localPath" ? e.source.path : e.source.baseUrl;
 }
 
-export default function RecentList({ recents, activeKey, onOpen, onClear }: Props) {
+export default function RecentList({ recents, activeKey, onOpen, onRemove, onClear }: Props) {
+  // Remove an entry: middle-click (desktop) or long-press (touch). A fired
+  // long-press also suppresses the trailing tap so it doesn't reopen the entry.
+  const pressTimer = useRef<number | null>(null);
+  const longFired = useRef(false);
+
+  const startPress = (entry: RecentEntry) => {
+    longFired.current = false;
+    pressTimer.current = window.setTimeout(() => {
+      longFired.current = true;
+      onRemove(entry);
+    }, 500);
+  };
+  const cancelPress = () => {
+    if (pressTimer.current != null) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  };
+  const handleClick = (entry: RecentEntry) => {
+    if (longFired.current) {
+      longFired.current = false;
+      return;
+    }
+    onOpen(entry);
+  };
+
   return (
     <section className="recents">
       <div className="recents__header">
@@ -40,8 +68,18 @@ export default function RecentList({ recents, activeKey, onOpen, onClear }: Prop
               <button
                 key={key}
                 className={`recent ${key === activeKey ? "recent--active" : ""}`}
-                onClick={() => onOpen(e)}
-                title={subtitle(e)}
+                onClick={() => handleClick(e)}
+                onMouseDown={(ev) => {
+                  if (ev.button === 1) {
+                    ev.preventDefault();
+                    onRemove(e);
+                  }
+                }}
+                onTouchStart={() => startPress(e)}
+                onTouchEnd={cancelPress}
+                onTouchMove={cancelPress}
+                onTouchCancel={cancelPress}
+                title={`${subtitle(e)}\nMiddle-click or long-press to remove`}
               >
                 {e.source.kind === "remote" ? (
                   <NetworkIcon className="recent__icon" width={16} height={16} />

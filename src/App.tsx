@@ -23,6 +23,7 @@ import {
   type RecentEntry,
   addRecent,
   clearRecents as clearRecentsStore,
+  removeRecent as removeRecentStore,
   loadRecents,
   reopenRecent,
 } from "./lib/recents";
@@ -114,6 +115,11 @@ export default function App() {
   );
 
   const clearRecents = useCallback(() => setRecents(clearRecentsStore()), []);
+
+  const removeRecent = useCallback(
+    (entry: RecentEntry) => setRecents(removeRecentStore(entry)),
+    []
+  );
 
   // Auto-dismiss the notice toast.
   useEffect(() => {
@@ -337,11 +343,17 @@ export default function App() {
               recents={recents}
               activeKey={activeKey}
               onOpen={openRecent}
+              onRemove={removeRecent}
               onClear={clearRecents}
             />
           </aside>
         )}
-        <ScoreView controller={controller} onOpenFile={quickOpen} mobile={mobile} />
+        <ScoreView
+          controller={controller}
+          onOpenFile={quickOpen}
+          onOpenLibrary={() => setLibraryOpen(true)}
+          mobile={mobile}
+        />
       </div>
 
       {mobile ? (
@@ -360,6 +372,7 @@ export default function App() {
             recents={recents}
             activeKey={activeKey}
             onOpen={openRecent}
+            onRemove={removeRecent}
             onClear={clearRecents}
           />
         </>

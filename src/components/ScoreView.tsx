@@ -7,6 +7,7 @@ const ZOOM_MAX = 2;
 interface Props {
   controller: AlphaTabController;
   onOpenFile: () => void;
+  onOpenLibrary: () => void;
   mobile: boolean;
 }
 
@@ -14,7 +15,7 @@ interface Props {
  * The score area. The outer `.score-viewport` is the scroll element handed to
  * alphaTab (player.scrollElement); alphaTab renders into the inner `.score-surface`.
  */
-export default function ScoreView({ controller, onOpenFile, mobile }: Props) {
+export default function ScoreView({ controller, onOpenFile, onOpenLibrary, mobile }: Props) {
   const { state, containerRef, viewportRef } = controller;
 
   // Two-finger pinch to change the zoom %. Browser viewport zoom is disabled on
@@ -91,12 +92,16 @@ export default function ScoreView({ controller, onOpenFile, mobile }: Props) {
         <button
           type="button"
           className="score-empty"
-          onClick={onOpenFile}
-          title="Open a tab file"
+          onClick={mobile ? onOpenLibrary : onOpenFile}
+          title={mobile ? "Open the library" : "Open a tab file"}
         >
           <div className="score-empty__inner">
             <h2>No tab loaded</h2>
-            <p>Click here to open a Guitar Pro / MusicXML file, or connect to a tab library on your network.</p>
+            <p>
+              {mobile
+                ? "Tap here to open the library: load a file or connect to a tab library on your network."
+                : "Click here to open a Guitar Pro / MusicXML file, or connect to a tab library on your network."}
+            </p>
           </div>
         </button>
       )}
