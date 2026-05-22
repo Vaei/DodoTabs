@@ -108,10 +108,48 @@ npm run tauri android dev      # run on a connected device / emulator
 npm run tauri android build    # build an APK
 ```
 
-The manifest already requests the `RECORD_AUDIO` permission used by metronome sync. Dev
-builds allow cleartext HTTP so the webview can reach a `http://<lan-ip>` library; a release
-APK needs `usesCleartextTraffic` enabled (or a network-security-config scoped to private
-ranges) for the LAN library to work.
+The manifest requests the `RECORD_AUDIO` permission used by metronome sync, and both debug
+and release builds allow cleartext HTTP so the webview can reach a `http://<lan-ip>` library.
+
+## Installing the Android app (sideload)
+
+DodoTabs is distributed as a signed APK; no Play Store needed.
+
+1. Get the APK: build it with `npm run tauri android build --apk` (output under
+   `src-tauri/gen/android/app/build/outputs/apk/universal/release/`), or use one shared with you.
+2. Copy the `.apk` to the phone (USB, email, a cloud drive, or a download link).
+3. On the phone, open the file. The first time, Android asks to allow installs from this
+   source: tap the prompt, turn on **Allow from this source**, go back, and open the APK again.
+4. Tap **Install**. If Play Protect warns about an unknown app, choose **Install anyway**.
+
+To update, just install a newer APK over the top; the shared signing key keeps your data and
+settings. There is no auto-update on Android by design, so a new APK is shared when there is
+a new version.
+
+## Building and distributing releases
+
+```bash
+npm run tauri build                # Windows installer -> src-tauri/target/release/bundle/nsis/
+npm run tauri android build --apk  # Signed Android APK (uses gen/android/key.properties)
+```
+
+The **desktop app auto-updates**: it checks GitHub Releases (`About -> Check for updates`),
+and downloads/installs a newer version. To cut a release, build with the updater signing key
+set so the update artifacts are signed, then publish the installer plus the generated
+`latest.json` and `.sig` to a GitHub release:
+
+```powershell
+$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content -Raw src-tauri\updater_key
+$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "<updater key password>"
+npm run tauri build
+```
+
+**Signing keys (keep safe, never commit, back up):**
+
+- Updater key `src-tauri/updater_key` (its public key is in `tauri.conf.json`). Required to
+  sign every desktop update; lose it and existing installs can't auto-update.
+- Android keystore `src-tauri/gen/android/dodotabs-release.jks` (credentials in
+  `key.properties`). Lose it and you can't ship updates to an installed app.
 
 ## Supported file formats
 
