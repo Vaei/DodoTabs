@@ -47,8 +47,9 @@ export default function AboutModal({ onClose }: Props) {
       } else {
         setUpdateStatus(await checkForUpdates());
       }
-    } catch {
-      setUpdateStatus("Couldn't check for updates right now.");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setUpdateStatus(`Update failed: ${msg}`);
     } finally {
       setChecking(false);
     }
