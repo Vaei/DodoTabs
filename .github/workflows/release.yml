@@ -9,7 +9,7 @@ on:
       - "v*"
 
 jobs:
-  release:
+  desktop:
     permissions:
       contents: write
     runs-on: windows-latest
@@ -43,6 +43,70 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "DodoTabs ${{ github.ref_name }}"
-          releaseBody: "Download the `*-setup.exe` installer below. The desktop app auto-updates to future releases."
+          releaseBody: "Windows: download the `*-setup.exe` installer (auto-updates). Android: download the `.apk` and sideload it."
           releaseDraft: true
           prerelease: false
+
+  # Builds the signed Android APK and attaches it to the same draft release.
+  # Android has no auto-updater, so this is just for sideloading. Needs two extra
+  # repo secrets: ANDROID_KEYSTORE_BASE64 and ANDROID_KEYSTORE_PASSWORD.
+  android:
+    needs: desktop
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Android NDK
+        id: ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27c
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Restore signing keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > src-tauri/gen/android/dodotabs-release.jks
+
+      - name: Write key.properties
+        run: |
+          cat > src-tauri/gen/android/key.properties <<EOF
+          storeFile=dodotabs-release.jks
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyAlias=dodotabs
+          keyPassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          EOF
+
+      - name: Build the APK
+        env:
+          NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+        run: npx tauri android build --apk
+
+      - name: Attach the APK to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          draft: true
+          files: src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk
