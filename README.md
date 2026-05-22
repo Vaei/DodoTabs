@@ -23,7 +23,13 @@ over Wi-Fi: grab them on your computer, then browse and play them on Android.
 
 ### Android
 
-Image coming soon
+#### Portrait
+
+<img width="298" height="645" alt="dodotabs_android_portrait" src="https://github.com/user-attachments/assets/128c87fc-3c24-40a3-a57a-4ce7b08589f9" />
+
+#### Landscape
+
+<img width="932" height="430" alt="dodotabs_android_landscape" src="https://github.com/user-attachments/assets/dd26d1b0-a347-4f97-85fb-5637bd142edf" />
 
 ## Features
 
