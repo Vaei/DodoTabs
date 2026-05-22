@@ -104,9 +104,14 @@ jobs:
           NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
         run: npx tauri android build --apk
 
+      - name: Name the APK after the app and version
+        run: |
+          cp src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk \
+            "DodoTabs_${GITHUB_REF_NAME#v}.apk"
+
       - name: Attach the APK to the release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           draft: true
-          files: src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk
+          files: DodoTabs_*.apk
