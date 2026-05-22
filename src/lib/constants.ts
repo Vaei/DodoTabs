@@ -2,6 +2,45 @@
 export const APP_VERSION = "1.0.0-beta";
 export const APP_AUTHOR = "Jared Taylor";
 export const GITHUB_URL = "https://github.com/Vaei/DodoTabs";
+export const APP_LICENSE = "AGPL-3.0";
+
+export interface LicenseEntry {
+  name: string;
+  license: string;
+  url?: string;
+}
+
+// Third-party components bundled in DodoTabs, shown on the About > Licenses screen.
+export const THIRD_PARTY_LICENSES: LicenseEntry[] = [
+  {
+    name: "alphaTab (notation + playback engine)",
+    license: "MPL-2.0",
+    url: "https://github.com/CoderLine/alphaTab",
+  },
+  {
+    name: "Sonivox EAS soundfont",
+    license: "Apache-2.0",
+    url: "https://github.com/CoderLine/alphaTab",
+  },
+  {
+    name: "Bravura music font",
+    license: "SIL OFL-1.1",
+    url: "https://github.com/steinbergmedia/bravura",
+  },
+  { name: "Inter font", license: "SIL OFL-1.1", url: "https://rsms.me/inter/" },
+  {
+    name: "Space Grotesk font",
+    license: "SIL OFL-1.1",
+    url: "https://github.com/floriankarsten/space-grotesk",
+  },
+  { name: "Tauri", license: "MIT / Apache-2.0", url: "https://tauri.app" },
+  { name: "React", license: "MIT", url: "https://react.dev" },
+  { name: "Vite", license: "MIT", url: "https://vitejs.dev" },
+  {
+    name: "Rust crates (axum, tokio, tower-http, serde, walkdir, local-ip-address)",
+    license: "MIT / Apache-2.0",
+  },
+];
 
 // Playback speed and zoom presets, shared by the transport controls and the
 // Ctrl/Shift + wheel handlers.
