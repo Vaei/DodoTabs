@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import type { AlphaTabController, AudioDeviceInfo } from "../lib/useAlphaTab";
+import { COUNT_IN_FULL_SPEED_KEY } from "../lib/useAlphaTab";
+import { KEEP_SCREEN_ON_KEY } from "../lib/useKeepAwake";
 import { CloseIcon } from "./Icons";
 
 interface Props {
@@ -35,10 +37,24 @@ export default function SettingsModal({
     const v = Number.parseFloat(localStorage.getItem(SYNC_OFFSET_KEY) ?? "0");
     return Number.isFinite(v) ? v : 0;
   });
+  const [countInFullSpeed, setCountInFullSpeed] = useState(
+    () => (localStorage.getItem(COUNT_IN_FULL_SPEED_KEY) ?? "1") !== "0"
+  );
+  const [keepScreenOn, setKeepScreenOn] = useState(
+    () => (localStorage.getItem(KEEP_SCREEN_ON_KEY) ?? "1") !== "0"
+  );
 
   const changeSyncOffset = (v: number) => {
     setSyncOffset(v);
     localStorage.setItem(SYNC_OFFSET_KEY, String(v));
+  };
+  const changeCountInFullSpeed = (v: boolean) => {
+    setCountInFullSpeed(v);
+    localStorage.setItem(COUNT_IN_FULL_SPEED_KEY, v ? "1" : "0");
+  };
+  const changeKeepScreenOn = (v: boolean) => {
+    setKeepScreenOn(v);
+    localStorage.setItem(KEEP_SCREEN_ON_KEY, v ? "1" : "0");
   };
 
   // Output devices come from alphaTab (uses setSinkId where supported; returns an
@@ -159,6 +175,22 @@ export default function SettingsModal({
               />
               <span className="settings-unit">BPM</span>
             </span>
+          </label>
+          <label className="settings-row">
+            <span>Count-in plays at full speed (ignores playback speed)</span>
+            <input
+              type="checkbox"
+              checked={countInFullSpeed}
+              onChange={(e) => changeCountInFullSpeed(e.target.checked)}
+            />
+          </label>
+          <label className="settings-row">
+            <span>Keep screen on while playing</span>
+            <input
+              type="checkbox"
+              checked={keepScreenOn}
+              onChange={(e) => changeKeepScreenOn(e.target.checked)}
+            />
           </label>
           <label className="settings-row">
             <span>Tempo-sync offset</span>

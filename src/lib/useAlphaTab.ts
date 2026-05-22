@@ -8,6 +8,7 @@ export interface AudioDeviceInfo {
 }
 
 const OUTPUT_DEVICE_KEY = "dodotabs.outputDevice";
+export const COUNT_IN_FULL_SPEED_KEY = "dodotabs.countInFullSpeed";
 
 export interface TrackInfo {
   index: number;
@@ -208,6 +209,43 @@ export function useAlphaTab(): AlphaTabController {
       }
     },
     [clearPendingStart, snapToBeat, patch]
+  );
+
+  // Duration (ms) of the one-bar count-in at the song's tempo (i.e. at 1x speed),
+  // for the count-in-at-full-speed option.
+  const countInDurationMs = useCallback((): number => {
+    const api = apiRef.current;
+    const bars = api?.score?.masterBars;
+    const tempo = api?.score?.tempo ?? 0;
+    if (!api || !bars || bars.length === 0 || tempo <= 0) return 0;
+    const tick = api.tickPosition;
+    let i = 0;
+    while (i + 1 < bars.length && bars[i + 1].start <= tick) i++;
+    const barEnd = i + 1 < bars.length ? bars[i + 1].start : api.endTick;
+    const quarters = (barEnd - bars[i].start) / 960; // alphaTab uses 960 ticks/quarter
+    return quarters * (60000 / tempo);
+  }, []);
+
+  // Starts playback; when a count-in is active and "count-in at full speed" is on,
+  // plays the count-in at 1x and restores the user's speed once it's over, so a
+  // slowed practice tempo doesn't drag out the count-in.
+  const startWithCountIn = useCallback(
+    (start: () => void) => {
+      const api = apiRef.current;
+      const fullSpeed = (localStorage.getItem(COUNT_IN_FULL_SPEED_KEY) ?? "1") !== "0";
+      if (!api || !fullSpeed || countInModeRef.current === 0 || api.playbackSpeed === 1) {
+        start();
+        return;
+      }
+      const userSpeed = api.playbackSpeed;
+      const duration = countInDurationMs();
+      api.playbackSpeed = 1;
+      start();
+      window.setTimeout(() => {
+        if (apiRef.current) apiRef.current.playbackSpeed = userSpeed;
+      }, duration);
+    },
+    [countInDurationMs]
   );
 
   // Native (seamless) looping is used only for modes 0/1 with sync off. For count-in
@@ -438,7 +476,7 @@ export function useAlphaTab(): AlphaTabController {
           const a2 = apiRef.current;
           if (!a2) return;
           if (countInModeRef.current === 2) {
-            a2.play();
+            startWithCountIn(() => a2.play());
           } else {
             const v = a2.countInVolume;
             a2.countInVolume = 0;
@@ -511,12 +549,12 @@ export function useAlphaTab(): AlphaTabController {
   // Starting playback goes through the scheduler (so metronome-sync can delay it to
   // the next beat); pausing is always immediate.
   const play = useCallback(() => {
-    scheduleStart(() => apiRef.current?.play(), true);
-  }, [scheduleStart]);
+    scheduleStart(() => startWithCountIn(() => apiRef.current?.play()), true);
+  }, [scheduleStart, startWithCountIn]);
   const playPause = useCallback(() => {
     if (playingRef.current) apiRef.current?.playPause();
-    else scheduleStart(() => apiRef.current?.playPause(), true);
-  }, [scheduleStart]);
+    else scheduleStart(() => startWithCountIn(() => apiRef.current?.playPause()), true);
+  }, [scheduleStart, startWithCountIn]);
   const stop = useCallback(() => {
     clearPendingStart(); // drop any pending sync-aligned start
     apiRef.current?.stop();

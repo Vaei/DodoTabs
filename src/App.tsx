@@ -18,6 +18,7 @@ import TopDrawer from "./components/mobile/TopDrawer";
 import TracksDrawer from "./components/mobile/TracksDrawer";
 import { openLocalFile, type LoadedFile, type TabSource } from "./lib/runtime";
 import { useMobile } from "./lib/useMobile";
+import { useKeepAwake } from "./lib/useKeepAwake";
 import { useFileDrop } from "./lib/useFileDrop";
 import {
   type RecentEntry,
@@ -40,6 +41,7 @@ export default function App() {
   const { state } = controller;
   const tempoSync = useTempoSync(controller);
   const mobile = useMobile();
+  useKeepAwake(state.playing); // hold a screen wake lock while playing (if enabled)
   const [leftOpen, setLeftOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
