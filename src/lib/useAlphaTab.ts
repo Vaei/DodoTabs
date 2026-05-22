@@ -484,9 +484,8 @@ export function useAlphaTab(): AlphaTabController {
       const saved = localStorage.getItem(OUTPUT_DEVICE_KEY);
       if (!saved) return;
       try {
-        const devices = await api.enumerateOutputDevices();
-        const match = devices.find((d) => d.deviceId === saved);
-        if (match) await api.setOutputDevice(match);
+        type Device = Parameters<typeof api.setOutputDevice>[0];
+        await api.setOutputDevice({ deviceId: saved, label: "", isDefault: false } as Device);
       } catch {
         /* output device selection unsupported on this platform */
       }
@@ -679,12 +678,16 @@ export function useAlphaTab(): AlphaTabController {
     });
   }, [applyLooping]);
 
+  // Enumerate outputs via the standard mediaDevices API (the same one that works for
+  // inputs). alphaTab's enumerateOutputDevices() comes back empty in this webview, so
+  // we list here and hand alphaTab a constructed device for setSinkId in setOutputDevice.
   const listOutputDevices = useCallback(async (): Promise<AudioDeviceInfo[]> => {
-    const api = apiRef.current;
-    if (!api) return [];
     try {
-      const devices = await api.enumerateOutputDevices();
-      return devices.map((d) => ({ deviceId: d.deviceId, label: d.label }));
+      if (!navigator.mediaDevices?.enumerateDevices) return [];
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      return devices
+        .filter((d) => d.kind === "audiooutput" && d.deviceId && d.deviceId !== "default")
+        .map((d) => ({ deviceId: d.deviceId, label: d.label }));
     } catch {
       return [];
     }
@@ -698,10 +701,9 @@ export function useAlphaTab(): AlphaTabController {
       await api.setOutputDevice(null);
       return;
     }
-    const devices = await api.enumerateOutputDevices();
-    const match = devices.find((d) => d.deviceId === deviceId) ?? null;
-    await api.setOutputDevice(match);
-    if (match) localStorage.setItem(OUTPUT_DEVICE_KEY, deviceId);
+    type Device = Parameters<typeof api.setOutputDevice>[0];
+    await api.setOutputDevice({ deviceId, label: "", isDefault: false } as Device);
+    localStorage.setItem(OUTPUT_DEVICE_KEY, deviceId);
   }, []);
 
   const setZoom = useCallback((zoom: number) => {
