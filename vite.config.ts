@@ -26,7 +26,10 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: true,
-    host: host || false,
+    // Bind all interfaces so the dev server is reachable both at localhost (the
+    // desktop webview, which needs a secure context for mediaDevices/getUserMedia)
+    // and at the machine's LAN IP (the Android device on the same Wi-Fi).
+    host: true,
     hmr: host
       ? {
           protocol: "ws",
