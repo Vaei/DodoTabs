@@ -525,15 +525,6 @@ export function useAlphaTab(): AlphaTabController {
       patch({ error: String((error as { message?: string })?.message ?? error) });
     });
 
-    // After loading a new song, alphaTab can redraw the previous song's selection
-    // highlight (the orange divs inside .at-selection) from stale internal state.
-    // Whenever nothing is selected, scrub any lingering highlight after a render.
-    api.postRenderFinished.on(() => {
-      if (hasSelectionRef.current) return;
-      document.querySelectorAll(".at-selection").forEach((el) => {
-        if (el.childElementCount > 0) (el as HTMLElement).innerHTML = "";
-      });
-    });
 
     return () => {
       api.destroy();
@@ -582,6 +573,24 @@ export function useAlphaTab(): AlphaTabController {
       api.isLooping = false;
     }
     api?.load(file.data);
+
+    // alphaTab redraws the previous song's loop selection (the orange divs inside
+    // .at-selection) from stale internal state while the new score renders, and it
+    // can do so on different ticks. Watch the DOM for a couple of seconds after the
+    // load and remove any selection highlight the moment it reappears while nothing
+    // is actually selected. Timing-independent, and self-disconnects.
+    if (typeof MutationObserver !== "undefined") {
+      const scrub = () => {
+        if (hasSelectionRef.current) return;
+        document.querySelectorAll(".at-selection").forEach((el) => {
+          if (el.childElementCount > 0) (el as HTMLElement).innerHTML = "";
+        });
+      };
+      const observer = new MutationObserver(scrub);
+      observer.observe(document.body, { childList: true, subtree: true });
+      scrub();
+      window.setTimeout(() => observer.disconnect(), 2500);
+    }
   }, [patch]);
 
   // Starting playback goes through the scheduler (so metronome-sync can delay it to
