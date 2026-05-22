@@ -112,6 +112,23 @@ fn save_tab(dir: String, name: String, bytes: Vec<u8>) -> Result<String, String>
     Ok(dest.to_string_lossy().to_string())
 }
 
+/// Deletes a tab from the local library folder. `path` is folder-relative; the
+/// resolved file must stay inside the library (guards against path traversal).
+#[tauri::command]
+fn delete_local_tab(dir: String, path: String) -> Result<(), String> {
+    let base = PathBuf::from(&dir)
+        .canonicalize()
+        .map_err(|e| e.to_string())?;
+    let target = base
+        .join(&path)
+        .canonicalize()
+        .map_err(|e| e.to_string())?;
+    if !target.starts_with(&base) {
+        return Err("Refusing to delete outside the library".into());
+    }
+    std::fs::remove_file(&target).map_err(|e| e.to_string())
+}
+
 /// Lists the supported tab files already saved in the local library folder.
 #[tauri::command]
 fn list_local_tabs(dir: String) -> Vec<server::TabEntry> {
@@ -145,7 +162,8 @@ pub fn run() {
             read_file,
             default_library_dir,
             save_tab,
-            list_local_tabs
+            list_local_tabs,
+            delete_local_tab
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

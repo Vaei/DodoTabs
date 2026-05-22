@@ -259,6 +259,23 @@ export async function loadLocalTab(dir: string, rel: string): Promise<LoadedFile
   return { name: basename(rel), data, source: { kind: "localPath", path } };
 }
 
+/** Deletes a tab from the local library folder. */
+export async function deleteLocalTab(dir: string, rel: string): Promise<void> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("delete_local_tab", { dir, path: rel });
+}
+
+/** Native yes/no confirmation dialog. Returns true if the user confirms. */
+export async function confirmDelete(name: string): Promise<boolean> {
+  const { confirm } = await import("@tauri-apps/plugin-dialog");
+  return confirm(`Delete "${name}" from this device?`, {
+    title: "Delete tab",
+    kind: "warning",
+    okLabel: "Delete",
+    cancelLabel: "Cancel",
+  });
+}
+
 /** Triggers a normal browser download (used when there is no Tauri filesystem). */
 export function downloadInBrowser(file: { name: string; data: Uint8Array }): void {
   const blob = new Blob([file.data as BlobPart], { type: "application/octet-stream" });

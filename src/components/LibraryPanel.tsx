@@ -15,9 +15,11 @@ import {
   saveToLibrary,
   listLocalTabs,
   loadLocalTab,
+  deleteLocalTab,
+  confirmDelete,
   downloadInBrowser,
 } from "../lib/runtime";
-import { FileIcon, FolderIcon, NetworkIcon, CloseIcon, DownloadIcon } from "./Icons";
+import { FileIcon, FolderIcon, NetworkIcon, CloseIcon, DownloadIcon, TrashIcon } from "./Icons";
 
 interface Props {
   onLoad: (file: LoadedFile) => void;
@@ -163,6 +165,18 @@ export default function LibraryPanel({ onLoad, onClose }: Props) {
     }
   };
 
+  const handleDeleteLocal = async (tab: RemoteTab) => {
+    if (!localLib) return;
+    if (!(await confirmDelete(tab.name))) return;
+    try {
+      await deleteLocalTab(localLib, tab.path);
+      setLocalTabs(await listLocalTabs(localLib));
+      setMessage(`Deleted "${tab.name}" from this device.`);
+    } catch (e) {
+      setMessage(`Delete failed: ${String(e)}`);
+    }
+  };
+
   // In Tauri, downloads need a destination folder; the browser uses a normal download.
   const canDownload = !tauri || !!localLib;
 
@@ -276,6 +290,14 @@ export default function LibraryPanel({ onLoad, onClose }: Props) {
                   <button className="tab-list__open" onClick={() => handleLoadLocal(t)} disabled={busy}>
                     <FileIcon />
                     <span>{t.name}</span>
+                  </button>
+                  <button
+                    className="tab-list__dl tab-list__del"
+                    onClick={() => handleDeleteLocal(t)}
+                    title="Delete from this device"
+                    aria-label="Delete from this device"
+                  >
+                    <TrashIcon />
                   </button>
                 </li>
               ))}

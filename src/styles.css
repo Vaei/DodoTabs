@@ -972,6 +972,9 @@ textarea {
 .tab-list .tab-list__dl:hover:not(:disabled) {
   color: var(--accent);
 }
+.tab-list .tab-list__del:hover:not(:disabled) {
+  color: var(--mute);
+}
 .tab-list .tab-list__dl:disabled {
   opacity: 0.4;
   cursor: not-allowed;
