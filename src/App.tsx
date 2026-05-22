@@ -11,7 +11,13 @@ import FileMenu from "./components/FileMenu";
 import AboutModal from "./components/AboutModal";
 import SettingsModal from "./components/SettingsModal";
 import TempoSyncModal from "./components/TempoSyncModal";
+import LeftDrawer from "./components/mobile/LeftDrawer";
+import BottomDrawer from "./components/mobile/BottomDrawer";
+import FloatingTransport from "./components/mobile/FloatingTransport";
+import TopDrawer from "./components/mobile/TopDrawer";
+import TracksDrawer from "./components/mobile/TracksDrawer";
 import { openLocalFile, type LoadedFile, type TabSource } from "./lib/runtime";
+import { useMobile } from "./lib/useMobile";
 import { useFileDrop } from "./lib/useFileDrop";
 import {
   type RecentEntry,
@@ -20,7 +26,7 @@ import {
   loadRecents,
   reopenRecent,
 } from "./lib/recents";
-import { FolderIcon, MicIcon } from "./components/Icons";
+import { FolderIcon, MicIcon, CloseIcon } from "./components/Icons";
 
 function keyOf(source: TabSource): string | null {
   if (source.kind === "localPath") return `local:${source.path}`;
@@ -32,6 +38,8 @@ export default function App() {
   const controller = useAlphaTab();
   const { state } = controller;
   const tempoSync = useTempoSync(controller);
+  const mobile = useMobile();
+  const [leftOpen, setLeftOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -249,12 +257,30 @@ export default function App() {
   ]);
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <span className="brand__mark">🦤</span>
-          <span className="brand__name">DodoTabs</span>
-        </div>
+    <div className={`app ${mobile ? "app--mobile" : ""}`}>
+      {mobile && (
+        <TopDrawer
+          title={state.title}
+          artist={state.artist}
+          scoreLoaded={state.scoreLoaded}
+          micActive={tempoSync.state.listening}
+          recents={recents}
+          onOpenFile={quickOpen}
+          onOpenLibrary={() => setLibraryOpen(true)}
+          onOpenRecent={openRecent}
+          onOpenRecents={() => setLeftOpen(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenAbout={() => setAboutOpen(true)}
+          onOpenMic={() => setTempoOpen(true)}
+        />
+      )}
+
+      {!mobile && (
+        <header className="topbar">
+          <div className="brand">
+            <span className="brand__mark">🦤</span>
+            <span className="brand__name">DodoTabs</span>
+          </div>
 
         <nav className="menubar">
           <FileMenu
@@ -298,30 +324,65 @@ export default function App() {
             <span>Library</span>
           </button>
         </div>
-      </header>
+        </header>
+      )}
 
       <div className="main">
-        <aside className="sidebar">
-          <TrackSidebar controller={controller} />
-          <RecentList
+        {mobile ? (
+          <TracksDrawer controller={controller} />
+        ) : (
+          <aside className="sidebar">
+            <TrackSidebar controller={controller} />
+            <RecentList
+              recents={recents}
+              activeKey={activeKey}
+              onOpen={openRecent}
+              onClear={clearRecents}
+            />
+          </aside>
+        )}
+        <ScoreView controller={controller} onOpenFile={quickOpen} />
+      </div>
+
+      {mobile ? (
+        <>
+          <FloatingTransport controller={controller} />
+          <BottomDrawer
+            controller={controller}
+            syncEnabled={syncEnabled}
+            syncAvailable={listening}
+            onToggleSync={() => setSyncEnabled((v) => !v)}
+            onOpenMic={() => setTempoOpen(true)}
+          />
+          <LeftDrawer
+            open={leftOpen}
+            onClose={() => setLeftOpen(false)}
             recents={recents}
             activeKey={activeKey}
             onOpen={openRecent}
             onClear={clearRecents}
           />
-        </aside>
-        <ScoreView controller={controller} onOpenFile={quickOpen} />
-      </div>
+        </>
+      ) : (
+        <TransportBar
+          controller={controller}
+          hotkeysVisible={hotkeysVisible}
+          onToggleHotkeys={toggleHotkeys}
+          syncEnabled={syncEnabled}
+          syncAvailable={listening}
+          onToggleSync={() => setSyncEnabled((v) => !v)}
+          onOpenMic={() => setTempoOpen(true)}
+        />
+      )}
 
-      <TransportBar
-        controller={controller}
-        hotkeysVisible={hotkeysVisible}
-        onToggleHotkeys={toggleHotkeys}
-        syncEnabled={syncEnabled}
-        syncAvailable={listening}
-        onToggleSync={() => setSyncEnabled((v) => !v)}
-        onOpenMic={() => setTempoOpen(true)}
-      />
+      {mobile && state.tapSelecting && (
+        <div className="tap-hint">
+          <span>Tap the start beat, then the end beat</span>
+          <button onClick={controller.toggleTapSelect} aria-label="Cancel section select">
+            <CloseIcon width={16} height={16} />
+          </button>
+        </div>
+      )}
 
       {dragging && (
         <div className="drop-overlay">

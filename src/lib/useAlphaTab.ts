@@ -36,6 +36,8 @@ export interface AlphaTabState {
   speed: number;
   looping: boolean;
   hasSelection: boolean;
+  // Mobile two-tap loop selection is armed (tap a start beat, then an end beat).
+  tapSelecting: boolean;
   snapToBar: boolean;
   metronome: boolean;
   // Count-in: 0 = off, 1 = once before playback, 2 = before every loop of a section
@@ -63,6 +65,7 @@ const initialState: AlphaTabState = {
   speed: 1,
   looping: false,
   hasSelection: false,
+  tapSelecting: false,
   snapToBar: false,
   metronome: false,
   countInMode: 0,
@@ -86,6 +89,7 @@ export interface AlphaTabController {
   setBpm: (bpm: number) => void;
   toggleLoop: () => void;
   clearSelection: () => void;
+  toggleTapSelect: () => void;
   toggleSnapToBar: () => void;
   toggleMetronome: () => void;
   cycleCountIn: () => void;
@@ -113,6 +117,9 @@ export function useAlphaTab(): AlphaTabController {
   // "Snap to bar" mode: expand drag-selection to whole-bar boundaries.
   const snapBarRef = useRef(false);
   const dragStartBeatRef = useRef<alphaTab.model.Beat | null>(null);
+  // Mobile two-tap selection: armed flag + the first tapped (anchor) beat.
+  const tapSelectRef = useRef(false);
+  const tapAnchorRef = useRef<alphaTab.model.Beat | null>(null);
   // Count-in mode + whether a section is selected, for the manual loop count-in.
   const countInModeRef = useRef<0 | 1 | 2>(0);
   const hasSelectionRef = useRef(false);
@@ -240,7 +247,35 @@ export function useAlphaTab(): AlphaTabController {
       const last = higher.voice.beats[higher.voice.beats.length - 1];
       if (first && last) api.highlightPlaybackRange(first, last);
     };
+    // Highlight a->b respecting the snap-to-bar toggle (used by two-tap selection,
+    // which has no drag to extend through).
+    const selectRange = (a: alphaTab.model.Beat, b: alphaTab.model.Beat) => {
+      if (snapBarRef.current) {
+        selectWholeBars(a, b);
+        return;
+      }
+      const aFirst =
+        a.voice.bar.index < b.voice.bar.index ||
+        (a.voice.bar.index === b.voice.bar.index && a.index <= b.index);
+      const first = aFirst ? a : b;
+      const last = aFirst ? b : a;
+      api.highlightPlaybackRange(first, last);
+    };
     api.beatMouseDown.on((beat) => {
+      // Mobile two-tap selection: first tap anchors the start, second sets the end.
+      // alphaTab's own mouse-up applies whatever range we highlight here.
+      if (tapSelectRef.current) {
+        if (!tapAnchorRef.current) {
+          tapAnchorRef.current = beat;
+          selectRange(beat, beat);
+        } else {
+          selectRange(tapAnchorRef.current, beat);
+          tapAnchorRef.current = null;
+          tapSelectRef.current = false;
+          patch({ tapSelecting: false });
+        }
+        return;
+      }
       if (!snapBarRef.current) return;
       dragStartBeatRef.current = beat;
       selectWholeBars(beat, beat);
@@ -496,6 +531,16 @@ export function useAlphaTab(): AlphaTabController {
     });
   }, []);
 
+  // Arm / disarm the mobile two-tap loop selection.
+  const toggleTapSelect = useCallback(() => {
+    setState((s) => {
+      const tapSelecting = !s.tapSelecting;
+      tapSelectRef.current = tapSelecting;
+      tapAnchorRef.current = null;
+      return { ...s, tapSelecting };
+    });
+  }, []);
+
   const toggleMetronome = useCallback(() => {
     setState((s) => {
       const metronome = !s.metronome;
@@ -624,6 +669,7 @@ export function useAlphaTab(): AlphaTabController {
     setBpm,
     toggleLoop,
     clearSelection,
+    toggleTapSelect,
     toggleSnapToBar,
     toggleMetronome,
     cycleCountIn,
