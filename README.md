@@ -17,10 +17,39 @@ files over Wi-Fi: grab them on your computer, then browse and play them on your 
 
 ## Features
 
-* Windows + Android support
-* Share tab files between devices
-* Sync playback with physical metronome
-* BPM based speed scaling
+### Major
+
+* **Plays real tab files with full audio.** Open Guitar Pro, MusicXML, Capella or
+  AlphaTex files and hear them played back with a built-in instrument bank, not just
+  read them.
+* **Clear, dark score view.** A clean, distraction-free sheet that highlights the
+  current beat and scrolls itself as the song plays, so you never lose your place.
+* **Full playback control.** Play, pause, stop and scrub anywhere on the timeline.
+* **Slow it down or speed it up.** Practice tricky parts at any speed from a quarter
+  to double, set an exact target BPM, or zoom the notation in and out.
+* **Loop any section.** Mark a passage and loop it to drill it, with an optional
+  count-in before each repeat and snap-to-bar so loops land cleanly.
+* **Per-track mixer.** Mute, solo and set the volume of each instrument, choose which
+  tracks are shown on the sheet, and watch live meters show what is playing.
+* **Built-in metronome and count-in** to keep time and to lead you in before playback.
+* **Your tabs on every device.** One app for Windows, Android and the browser. Point
+  the desktop app at a folder of tabs and browse and play them on your phone over
+  Wi-Fi, or download them to the phone to keep for offline practice.
+
+### Minor
+
+* Recently opened list for one-tap reloading (middle-click or long-press to remove an
+  entry).
+* Drag and drop a tab file onto the window to open it.
+* Pinch to zoom the score on a phone or tablet.
+* Keyboard shortcuts for every transport action, with an on-screen cheat sheet.
+* Mouse-wheel shortcuts over the score: Ctrl for speed, Shift for zoom, Alt for BPM.
+* Middle-click a control to reset it to its default.
+* Pick which speaker/output and microphone the app uses.
+* Touch-friendly phone layout with swipe-or-tap drawers and floating play controls
+  that adapt to portrait or landscape.
+* Start playback in time with a physical metronome via the microphone (experimental;
+  works best on desktop).
 
 ## Project layout
 
