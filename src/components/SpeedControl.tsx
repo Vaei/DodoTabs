@@ -21,7 +21,25 @@ function format(value: number): string {
 export default function SpeedControl({ value, disabled, onChange }: Props) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState(format(value));
+  // The preset menu is positioned fixed (computed from the control) so it isn't
+  // clipped by a scrolling container, e.g. the mobile bottom drawer.
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>();
   const ref = useRef<HTMLDivElement>(null);
+
+  const toggleMenu = () => {
+    setOpen((o) => {
+      const next = !o;
+      if (next && ref.current) {
+        const r = ref.current.getBoundingClientRect();
+        setMenuStyle({
+          position: "fixed",
+          right: Math.round(window.innerWidth - r.right),
+          bottom: Math.round(window.innerHeight - r.top + 6),
+        });
+      }
+      return next;
+    });
+  };
 
   // Mirror external changes (preset dropdown, Ctrl+wheel) into the editable field.
   useEffect(() => setText(format(value)), [value]);
@@ -76,14 +94,14 @@ export default function SpeedControl({ value, disabled, onChange }: Props) {
           type="button"
           className="speedctl__caret"
           disabled={disabled}
-          onClick={() => setOpen((o) => !o)}
+          onClick={toggleMenu}
           aria-label="Speed presets"
         >
           <ChevronDownIcon width={14} height={14} />
         </button>
 
         {open && (
-          <div className="speedctl__menu">
+          <div className="speedctl__menu" style={menuStyle}>
             {SPEEDS.map((s) => (
               <button
                 key={s}
