@@ -1511,6 +1511,8 @@ body.is-mobile textarea {
     background: var(--panel);
     border-right: 1px solid var(--border);
     overflow-y: auto;
+    /* Clear the collapsed bottom drawer so the last track can scroll into view. */
+    padding-bottom: calc(var(--handle-h) + env(safe-area-inset-bottom) + 16px);
   }
   .tracks-drawer__handle {
     flex: 0 0 auto;
