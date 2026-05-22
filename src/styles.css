@@ -1627,6 +1627,8 @@ body.is-mobile textarea {
   }
   .drawer-scrim--tracks {
     z-index: 43;
+    /* Don't dim the score while the tracks drawer is open; still tap-to-close. */
+    background: transparent;
   }
 
   /* Landscape is short: shrink the floating controls and trim the score's
