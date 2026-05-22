@@ -135,8 +135,10 @@ npm run tauri android build --apk  # Signed Android APK (uses gen/android/key.pr
 
 The **desktop app auto-updates**: it checks GitHub Releases (`About -> Check for updates`),
 and downloads/installs a newer version. To cut a release, build with the updater signing key
-set so the update artifacts are signed, then publish the installer plus the generated
-`latest.json` and `.sig` to a GitHub release:
+set so the update artifacts (`.sig`) are produced, then publish the installer and `.sig` to a
+GitHub release along with a `latest.json` update manifest. The `latest.json` is generated for
+you by [`tauri-action`](https://github.com/tauri-apps/tauri-action) in CI, or you can write it
+by hand (version, notes, and the platform's installer URL + signature).
 
 ```powershell
 $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content -Raw src-tauri\updater_key
