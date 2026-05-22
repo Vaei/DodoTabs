@@ -59,8 +59,10 @@ export default function SettingsModal({
 
   // Output devices come from alphaTab (uses setSinkId where supported; returns an
   // empty list on platforms that can't switch output, e.g. some Android webviews).
+  // The non-default devices are only listed once media-device access is granted.
+  const loadOutputs = () => controller.listOutputDevices().then(setOutputs);
   useEffect(() => {
-    controller.listOutputDevices().then(setOutputs);
+    loadOutputs();
   }, [controller]);
 
   // Input (mic) devices - enumerated for a future "detect the room metronome" feature.
@@ -87,6 +89,7 @@ export default function SettingsModal({
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((t) => t.stop());
       await loadInputs();
+      await loadOutputs(); // granting access also unlocks the output device list
     } catch {
       /* permission denied */
     }
@@ -235,10 +238,15 @@ export default function SettingsModal({
                 ))}
               </select>
               {outputs.length === 0 && (
-                <p className="settings-note">
-                  Only the system default is available right now. Other output devices appear
-                  here once playback has started.
-                </p>
+                <>
+                  <button className="btn btn--primary settings-grant" onClick={requestMic}>
+                    Grant device access
+                  </button>
+                  <p className="settings-note">
+                    Only the system default is shown. Grant device access to list your other
+                    output devices.
+                  </p>
+                </>
               )}
             </>
           ) : (
