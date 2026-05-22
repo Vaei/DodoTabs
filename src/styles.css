@@ -685,7 +685,10 @@ textarea {
   pointer-events: none;
 }
 .speedctl__input {
-  width: 44px;
+  /* Size to the value so the "x" sits right next to the number. */
+  width: auto;
+  min-width: 22px;
+  field-sizing: content;
   background: transparent;
   border: none;
   color: var(--text);
@@ -711,6 +714,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  margin-left: auto;
   width: 24px;
   height: 28px;
   border: none;
@@ -757,7 +761,8 @@ textarea {
 
 /* BPM (target tempo) field */
 .bpmctl {
-  width: 58px;
+  width: 100%;
+  min-width: 58px;
   height: 32px;
   border-radius: 8px;
   background: var(--elevated);
@@ -1227,6 +1232,7 @@ textarea {
   align-items: center;
   gap: 14px;
   flex-wrap: wrap;
+  margin-top: 12px;
 }
 .tempo-toggle {
   display: inline-flex;

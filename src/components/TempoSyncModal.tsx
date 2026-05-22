@@ -68,14 +68,14 @@ export default function TempoSyncModal({ sync, onClose }: Props) {
               </p>
               <div className="tempo-actions">
                 <button className="btn btn--primary" onClick={() => void sync.recordProfile()}>
-                  {hasProfile ? "Re-record profile" : "Record sound profile"}
+                  {hasProfile ? "Re-record" : "Record"}
                 </button>
                 <button className="btn" onClick={sync.applyDefaultProfile}>
-                  Default profile
+                  Default
                 </button>
                 {hasProfile && (
                   <button className="btn" onClick={sync.clearProfile}>
-                    Clear profile
+                    Clear
                   </button>
                 )}
               </div>
