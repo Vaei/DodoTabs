@@ -148,8 +148,6 @@ export function useAlphaTab(): AlphaTabController {
   const pendingStartRef = useRef<{ poll?: number; timer?: number }>({});
   // Cancels an in-progress custom (full-speed) count-in; see startWithCountIn.
   const countInCancelRef = useRef<(() => void) | null>(null);
-  // Set on load so the next render clears any leftover selection highlight DOM.
-  const clearSelectionVisualRef = useRef(false);
 
   const patch = useCallback((p: Partial<AlphaTabState>) => {
     setState((s) => ({ ...s, ...p }));
@@ -527,15 +525,14 @@ export function useAlphaTab(): AlphaTabController {
       patch({ error: String((error as { message?: string })?.message ?? error) });
     });
 
-    // After loading a new song, alphaTab reuses the cursor overlay and leaves the
-    // previous selection highlight in the DOM (the loop range is already cleared, so
-    // no redraw is triggered). Remove it once the new score has rendered.
+    // After loading a new song, alphaTab can redraw the previous song's selection
+    // highlight (the orange divs inside .at-selection) from stale internal state.
+    // Whenever nothing is selected, scrub any lingering highlight after a render.
     api.postRenderFinished.on(() => {
-      if (!clearSelectionVisualRef.current) return;
-      clearSelectionVisualRef.current = false;
-      containerRef.current
-        ?.querySelectorAll(".at-selection")
-        .forEach((el) => ((el as HTMLElement).innerHTML = ""));
+      if (hasSelectionRef.current) return;
+      document.querySelectorAll(".at-selection").forEach((el) => {
+        if (el.childElementCount > 0) (el as HTMLElement).innerHTML = "";
+      });
     });
 
     return () => {
@@ -583,7 +580,6 @@ export function useAlphaTab(): AlphaTabController {
     if (api) {
       api.playbackRange = null;
       api.isLooping = false;
-      clearSelectionVisualRef.current = true; // scrub the old highlight after re-render
     }
     api?.load(file.data);
   }, [patch]);
