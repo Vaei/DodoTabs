@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as alphaTab from "@coderline/alphatab";
 import type { LoadedFile } from "./runtime";
+import { playCountIn } from "./countIn";
 
 export interface AudioDeviceInfo {
   deviceId: string;
@@ -145,8 +146,8 @@ export function useAlphaTab(): AlphaTabController {
   );
   // Pending (not-yet-fired) sync-aligned start, so it can be cancelled on stop.
   const pendingStartRef = useRef<{ poll?: number; timer?: number }>({});
-  // Pending "restore playback speed after the full-speed count-in" (see startWithCountIn).
-  const countInRestoreRef = useRef<{ speed: number; startTick: number } | null>(null);
+  // Cancels an in-progress custom (full-speed) count-in; see startWithCountIn.
+  const countInCancelRef = useRef<(() => void) | null>(null);
 
   const patch = useCallback((p: Partial<AlphaTabState>) => {
     setState((s) => ({ ...s, ...p }));
@@ -213,23 +214,45 @@ export function useAlphaTab(): AlphaTabController {
     [clearPendingStart, snapToBeat, patch]
   );
 
-  // When a count-in is active and "count-in at full speed" is on, play the count-in
-  // at 1x; the user's speed is restored once real playback advances past the count-in
-  // (see the player-position handler). This keeps a slowed practice tempo from
-  // dragging out the count-in, without racing the count-in -> play transition.
+  // When a count-in is active and "count-in at full speed" is on at a slowed tempo,
+  // alphaTab's own count-in would be dragged out (and racing it lets the song bleed
+  // through). Instead silence alphaTab's count-in for this start, click out the bar
+  // ourselves at full tempo, then start the song at the user's speed once the count-in
+  // is fully over.
   const startWithCountIn = useCallback((start: () => void) => {
+    countInCancelRef.current?.(); // cancel any prior in-progress count-in
     const api = apiRef.current;
     const fullSpeed = (localStorage.getItem(COUNT_IN_FULL_SPEED_KEY) ?? "1") !== "0";
     if (!api || !fullSpeed || countInModeRef.current === 0 || api.playbackSpeed === 1) {
       start();
       return;
     }
-    countInRestoreRef.current = { speed: api.playbackSpeed, startTick: api.tickPosition };
-    api.playbackSpeed = 1;
-    // Let the speed change settle before starting, otherwise alphaTab briefly sounds
-    // the first note before the count-in pre-roll catches up (audible if a note sits
-    // right at the start and the practice speed is below 1x).
-    requestAnimationFrame(() => start());
+    const bars = api.score?.masterBars;
+    const tempo = api.score?.tempo ?? 0;
+    if (!bars || bars.length === 0 || tempo <= 0) {
+      start();
+      return;
+    }
+    const tick = api.tickPosition;
+    let i = 0;
+    while (i + 1 < bars.length && bars[i + 1].start <= tick) i++;
+    const barEnd = i + 1 < bars.length ? bars[i + 1].start : api.endTick;
+    const beats = bars[i].timeSignatureNumerator || 4;
+    const barMs = ((barEnd - bars[i].start) / 960) * (60000 / tempo); // 960 ticks/quarter
+    const intervalMs = barMs / beats;
+
+    const savedCountIn = api.countInVolume;
+    api.countInVolume = 0; // our clicks replace alphaTab's count-in for this start
+    const finish = (play: boolean) => {
+      countInCancelRef.current = null;
+      if (apiRef.current) apiRef.current.countInVolume = savedCountIn;
+      if (play) start();
+    };
+    const cancelClicks = playCountIn(beats, intervalMs, () => finish(true));
+    countInCancelRef.current = () => {
+      cancelClicks();
+      finish(false);
+    };
   }, []);
 
   // Native (seamless) looping is used only for modes 0/1 with sync off. For count-in
@@ -406,14 +429,6 @@ export function useAlphaTab(): AlphaTabController {
 
 
     api.playerPositionChanged.on((e) => {
-      // Full-speed count-in: once playback advances past where it started (i.e. the
-      // count-in is over and the song is rolling), restore the user's practice speed.
-      const restore = countInRestoreRef.current;
-      if (restore && e.currentTick > restore.startTick) {
-        countInRestoreRef.current = null;
-        if (apiRef.current) apiRef.current.playbackSpeed = restore.speed;
-      }
-
       patch({
         currentTime: e.currentTime,
         endTime: e.endTime,
@@ -548,12 +563,7 @@ export function useAlphaTab(): AlphaTabController {
   }, [scheduleStart, startWithCountIn]);
   const stop = useCallback(() => {
     clearPendingStart(); // drop any pending sync-aligned start
-    // If stopped mid count-in, put the practice speed back.
-    const restore = countInRestoreRef.current;
-    if (restore) {
-      countInRestoreRef.current = null;
-      if (apiRef.current) apiRef.current.playbackSpeed = restore.speed;
-    }
+    countInCancelRef.current?.(); // abort an in-progress full-speed count-in
     apiRef.current?.stop();
   }, [clearPendingStart]);
 
