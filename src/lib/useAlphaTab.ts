@@ -226,7 +226,10 @@ export function useAlphaTab(): AlphaTabController {
     }
     countInRestoreRef.current = { speed: api.playbackSpeed, startTick: api.tickPosition };
     api.playbackSpeed = 1;
-    start();
+    // Let the speed change settle before starting, otherwise alphaTab briefly sounds
+    // the first note before the count-in pre-roll catches up (audible if a note sits
+    // right at the start and the practice speed is below 1x).
+    requestAnimationFrame(() => start());
   }, []);
 
   // Native (seamless) looping is used only for modes 0/1 with sync off. For count-in
