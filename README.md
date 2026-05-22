@@ -5,15 +5,15 @@ Renders and plays back Guitar Pro / MusicXML / Capella / AlphaTex files with a d
 modern interface: beat-cursor following, auto-scroll, per-track mute/solo/volume,
 tempo, looping, metronome, count-in, zoom and layout switching.
 
-Runs in three places from one React frontend:
+Runs on two platforms from one React frontend:
 
 - **Windows desktop** (Tauri): opens local files and shares a folder of tabs over your LAN.
-- **Android** (Tauri): a client that opens local files or connects to a desktop's library.
-- **Firefox / any browser**: the same client, served as a static web app.
+- **Android** (Tauri): opens local files, connects to a desktop's library over Wi-Fi, and
+  downloads tabs for offline play.
 
 DodoTabs plays structured tab files (Guitar Pro, MusicXML, Capella, AlphaTex), not plain
-text tabs. To read your tabs on other devices, the desktop app can serve a folder of tab
-files over Wi-Fi: grab them on your computer, then browse and play them on your phone.
+text tabs. To read your tabs on your phone, the desktop app can serve a folder of tab files
+over Wi-Fi: grab them on your computer, then browse and play them on Android.
 
 ## Features
 
@@ -67,6 +67,8 @@ src-tauri/           Rust/Tauri shell
 
 - Node.js 20+ and npm
 - Rust (stable) plus the `x86_64-pc-windows-msvc` target (default on Windows)
+- For Android: JDK 17, the Android SDK + NDK, the env vars `JAVA_HOME`, `ANDROID_HOME`,
+  `NDK_HOME`, and the Rust Android targets (see [Android](#android))
 
 ## Develop and run
 
@@ -76,41 +78,49 @@ npm install
 # Desktop app (Windows) with hot reload
 npm run tauri dev
 
-# Web app (Firefox / browser): just the frontend
-npm run dev            # dev server at http://localhost:1420
-npm run build          # static site in dist/  (deploy anywhere, or npm run preview)
+# Android app (USB device or emulator) with hot reload
+npm run tauri android dev
+
+# Production builds
+npm run tauri build                # Windows
+npm run tauri android build --apk  # Android APK
 ```
 
 ## Sharing a library (PC to phone)
 
 1. On the desktop app, click **Library**, then **Choose a folder to share**, and pick a folder of tabs.
 2. The app shows an address like `http://192.168.1.50:8088`.
-3. On your phone (Firefox, or the Android app), open that address in DodoTabs' **Library**,
-   **Connect to a library** field, hit **Connect**, and pick a tab.
+3. On the Android app, open that address in DodoTabs' **Library**, **Connect to a library**
+   field, hit **Connect**, and pick a tab (or download it for offline play).
 
 The server binds `0.0.0.0` with permissive CORS and only serves supported tab extensions
 from the chosen folder (path-traversal guarded).
 
-## Android (follow-up: toolchain not yet installed)
+## Android
 
-App icons and the mobile entry point (`#[cfg_attr(mobile, tauri::mobile_entry_point)]`)
-are already in place. To produce an Android build you still need to install the toolchain:
+The Android project is scaffolded under `src-tauri/gen/android`. To build it, install
+JDK 17 and the Android SDK + NDK, set `JAVA_HOME`, `ANDROID_HOME` and `NDK_HOME`, and add
+the Rust Android targets:
 
 ```bash
-# 1. Install JDK 17, Android SDK + NDK; set JAVA_HOME, ANDROID_HOME, NDK_HOME.
-# 2. Add the Rust Android targets:
 rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
-# 3. Scaffold and run:
-npm run tauri android init
-npm run tauri android dev      # or: npm run tauri android build
+npm run tauri android dev      # run on a connected device / emulator
+npm run tauri android build    # build an APK
 ```
 
-After `android init`, allow cleartext HTTP so the webview can reach a `http://<lan-ip>`
-library: add `android:usesCleartextTraffic="true"` to the `<application>` tag in
-`src-tauri/gen/android/app/src/main/AndroidManifest.xml` (or a network-security-config
-scoped to private ranges).
+The manifest already requests the `RECORD_AUDIO` permission used by metronome sync. Dev
+builds allow cleartext HTTP so the webview can reach a `http://<lan-ip>` library; a release
+APK needs `usesCleartextTraffic` enabled (or a network-security-config scoped to private
+ranges) for the LAN library to work.
 
 ## Supported file formats
 
 `.gp .gp3 .gp4 .gp5 .gpx .gp7 .gp8` (Guitar Pro), `.musicxml .xml .mxl` (MusicXML),
 `.capx` (Capella), `.alphatab .tex` (AlphaTex).
+
+## License
+
+DodoTabs is licensed under the [GNU AGPL-3.0](LICENSE). It bundles third-party components
+under their own licenses: alphaTab (MPL-2.0), the Sonivox EAS soundfont (Apache-2.0), the
+Bravura, Inter and Space Grotesk fonts (SIL OFL-1.1), and the Tauri/React stack
+(MIT/Apache-2.0). The full list is in the in-app **About -> Licenses** screen.
