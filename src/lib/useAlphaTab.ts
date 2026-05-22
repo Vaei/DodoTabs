@@ -318,6 +318,12 @@ export function useAlphaTab(): AlphaTabController {
         activity: 0,
       }));
       autoLoopRef.current = false;
+      // Clear any section loop carried over from the previous song; a stale playback
+      // range otherwise leaves the player looping a range that no longer matches.
+      api.playbackRange = null;
+      api.isLooping = false;
+      hasSelectionRef.current = false;
+      loopingRef.current = false;
       // Track every track index (the audio plays them all) for the activity meters.
       allTrackIdsRef.current = new Set((score?.tracks ?? []).map((t) => t.index));
       lastBeatIdRef.current.clear();
@@ -335,6 +341,7 @@ export function useAlphaTab(): AlphaTabController {
         currentTick: 0,
         speed: 1,
         hasSelection: false,
+        looping: false,
       });
     });
 
