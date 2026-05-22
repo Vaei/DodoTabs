@@ -3,46 +3,68 @@
 // "count-in at full speed" option so the count-in tempo is independent of the
 // playback speed, and so the song never sounds until the count-in is over. Returns a
 // cancel function (stops pending clicks and the onDone callback).
-export function playCountIn(beats: number, intervalMs: number, onDone: () => void): () => void {
+
+// One shared AudioContext for the whole app. Browsers cap the number of contexts
+// (~6), so creating one per count-in eventually throws and breaks playback.
+let sharedCtx: AudioContext | null = null;
+function getCtx(): AudioContext | null {
   const Ctor: typeof AudioContext | undefined =
-    window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!Ctor || beats <= 0 || intervalMs <= 0) {
+    window.AudioContext ??
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!Ctor) return null;
+  if (!sharedCtx) {
+    try {
+      sharedCtx = new Ctor();
+    } catch {
+      return null;
+    }
+  }
+  void sharedCtx.resume?.();
+  return sharedCtx;
+}
+
+export function playCountIn(beats: number, intervalMs: number, onDone: () => void): () => void {
+  const ctx = getCtx();
+  if (!ctx || beats <= 0 || intervalMs <= 0) {
     onDone();
     return () => {};
   }
 
-  const ctx = new Ctor();
-  void ctx.resume?.();
   const lead = 0.08; // small lead so the first click isn't clipped
   const interval = intervalMs / 1000;
+  const oscillators: OscillatorNode[] = [];
 
-  const click = (at: number, accent: boolean) => {
+  for (let i = 0; i < beats; i++) {
+    const at = ctx.currentTime + lead + i * interval;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.frequency.value = accent ? 1600 : 1000;
+    osc.frequency.value = i === 0 ? 1600 : 1000;
     gain.gain.setValueAtTime(0.0001, at);
     gain.gain.exponentialRampToValueAtTime(0.5, at + 0.001);
     gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.05);
     osc.connect(gain).connect(ctx.destination);
     osc.start(at);
     osc.stop(at + 0.06);
-  };
-
-  for (let i = 0; i < beats; i++) {
-    click(ctx.currentTime + lead + i * interval, i === 0);
+    oscillators.push(osc);
   }
 
   let cancelled = false;
-  const close = () => ctx.close().catch(() => {});
-  const doneTimer = window.setTimeout(() => {
-    if (cancelled) return;
-    onDone();
-    close();
-  }, (lead + beats * interval) * 1000);
+  const doneTimer = window.setTimeout(
+    () => {
+      if (!cancelled) onDone();
+    },
+    (lead + beats * interval) * 1000
+  );
 
   return () => {
     cancelled = true;
     window.clearTimeout(doneTimer);
-    close(); // stops any still-scheduled clicks
+    oscillators.forEach((o) => {
+      try {
+        o.stop();
+      } catch {
+        /* already stopped */
+      }
+    });
   };
 }
