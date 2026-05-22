@@ -44,6 +44,17 @@ export function isTauriRuntime(): boolean {
   return inTauri();
 }
 
+/** Synchronous best-guess for "is this the Android client", from the user agent.
+ * Lets the mobile layout render on the very first paint (no desktop-UI flash on
+ * launch/resume); the async {@link isDesktopHost} still confirms it afterwards. */
+export function isLikelyMobile(): boolean {
+  return (
+    inTauri() &&
+    typeof navigator !== "undefined" &&
+    /android/i.test(navigator.userAgent)
+  );
+}
+
 /** True if the filename has a supported tab extension. */
 export function isSupportedTabFile(name: string): boolean {
   const lower = name.toLowerCase();
