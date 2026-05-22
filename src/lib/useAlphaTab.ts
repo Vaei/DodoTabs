@@ -227,6 +227,9 @@ export function useAlphaTab(): AlphaTabController {
     const settings = new alphaTab.Settings();
     settings.core.fontDirectory = "/font/";
     settings.core.logLevel = alphaTab.LogLevel.Warning;
+    // Surface lyrics that older Guitar Pro files stored as "beat text" (only kicks in
+    // when the track has no proper lyrics of its own).
+    settings.importer.beatTextAsLyrics = true;
     settings.display.layoutMode = alphaTab.LayoutMode.Page;
     settings.display.scale = 1;
 
