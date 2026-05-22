@@ -38,7 +38,7 @@ export interface TempoSyncController {
   state: TempoSyncState;
   start: () => Promise<void>;
   stop: () => void;
-  msToNextBeat: () => number | null;
+  msToNextBeat: (allowImmediate?: boolean) => number | null;
   recordProfile: () => Promise<void>;
   applyDefaultProfile: () => void;
   clearProfile: () => void;
@@ -154,6 +154,7 @@ export function useTempoSync(player: AlphaTabController): TempoSyncController {
         const clickPeak = clickPeakRef.current;
         const baseIndex = sampleClockRef.current;
         let candidateMs = -1;
+        let candidateI = -1;
 
         for (let i = 0; i < buf.length; i++) {
           const a = Math.abs(buf[i]);
@@ -166,6 +167,7 @@ export function useTempoSync(player: AlphaTabController): TempoSyncController {
             const tMs = ((baseIndex + i) / sr) * 1000;
             if (candidateMs < 0 && tMs - lastOnsetMsRef.current > REFRACTORY_MS) {
               candidateMs = tMs;
+              candidateI = i;
             }
           } else if (!armed && env < thr * 0.5) {
             armed = true;
@@ -179,23 +181,25 @@ export function useTempoSync(player: AlphaTabController): TempoSyncController {
             for (let b = 0; b < acc.length; b++) acc[b] += vec[b];
             calibCountRef.current++;
           }
+          // Onset time in the performance clock, corrected for where in the buffer the
+          // click landed (removes the per-block timing jitter).
+          const onsetPerf = performance.now() - ((buf.length - candidateI) / sr) * 1000;
+          const targetBpm = tempoRef.current * speedRef.current;
+          const period = targetBpm > 0 ? 60000 / targetBpm : 0;
           const accept = profile ? cosine(vec, profile) >= MATCH_THR : true;
           if (accept) {
-            const nowPerf = performance.now();
             lastOnsetMsRef.current = candidateMs;
-            lastOnsetPerfRef.current = nowPerf;
+            lastOnsetPerfRef.current = onsetPerf;
             clickPeakRef.current = clickPeak * 0.7 + blockPeak * 0.3;
 
             // Update the smoothed beat-phase anchor.
-            const targetBpm = tempoRef.current * speedRef.current;
-            if (targetBpm > 0) {
-              const period = 60000 / targetBpm;
-              if (!anchorValidRef.current || nowPerf - beatAnchorRef.current > 4000) {
-                beatAnchorRef.current = nowPerf;
+            if (period > 0) {
+              if (!anchorValidRef.current || onsetPerf - beatAnchorRef.current > 4000) {
+                beatAnchorRef.current = onsetPerf;
                 anchorValidRef.current = true;
               } else {
-                const k = Math.round((nowPerf - beatAnchorRef.current) / period);
-                const err = nowPerf - (beatAnchorRef.current + k * period);
+                const k = Math.round((onsetPerf - beatAnchorRef.current) / period);
+                const err = onsetPerf - (beatAnchorRef.current + k * period);
                 // Only let near-grid clicks adjust the phase (rejects jitter/guitar).
                 if (Math.abs(err) < period * 0.3) beatAnchorRef.current += err * 0.2;
               }
@@ -246,18 +250,25 @@ export function useTempoSync(player: AlphaTabController): TempoSyncController {
   // Milliseconds until the next metronome click (plus latency offset). The period
   // comes from the manually-set target tempo; the mic only supplies the phase.
   // Returns null if we don't have a tempo or haven't heard a click yet.
-  const msToNextBeat = useCallback((): number | null => {
+  // Delay (ms) until the next metronome beat. `allowImmediate` lets a loop restart
+  // that lands right on a beat fire now instead of waiting a whole period; for a
+  // fresh play it's false, so we always wait for the next beat (consistent landing).
+  const msToNextBeat = useCallback((allowImmediate = false): number | null => {
     const targetBpm = tempoRef.current * speedRef.current;
     if (targetBpm <= 0 || !anchorValidRef.current) return null;
     const periodMs = 60000 / targetBpm;
+    // Treat the metronome as stopped if no click arrived recently, so playback waits
+    // for a real beat instead of locking to a stale anchor.
+    if (performance.now() - lastOnsetPerfRef.current > Math.max(1500, periodMs * 2)) {
+      return null;
+    }
     const offset = Number.parseFloat(localStorage.getItem(SYNC_OFFSET_KEY) ?? "0") || 0;
     const now = performance.now();
-    // Phase within the current beat, from the smoothed anchor. If we just passed a
-    // beat (e.g. a loop that ended right on it), snap to it and start immediately;
-    // otherwise wait for the next beat.
     let phase = (now - beatAnchorRef.current) % periodMs;
     if (phase < 0) phase += periodMs;
-    const delay = phase <= periodMs * 0.25 ? 0 : periodMs - phase;
+    // Time to the next beat. Only collapse to "now" for a loop restart sitting right
+    // on the beat, never for a fresh play (that boundary was the inconsistency).
+    const delay = allowImmediate && phase <= periodMs * 0.15 ? 0 : periodMs - phase;
     return Math.max(0, delay + offset);
   }, []);
 

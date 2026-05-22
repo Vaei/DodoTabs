@@ -93,9 +93,15 @@ export default function TransportBar({
             className="btn btn--primary"
             onClick={controller.playPause}
             disabled={disabled}
-            title="Play / Pause (Space)"
+            title={state.awaitingBeat ? "Waiting for the metronome beat" : "Play / Pause (Space)"}
           >
-            {state.playing ? <PauseIcon /> : <PlayIcon />}
+            {state.awaitingBeat ? (
+              <span className="spinner" />
+            ) : state.playing ? (
+              <PauseIcon />
+            ) : (
+              <PlayIcon />
+            )}
           </button>
           <button className="btn" onClick={controller.stop} disabled={disabled} title="Stop (X)">
             <StopIcon />

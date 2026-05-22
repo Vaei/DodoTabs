@@ -152,25 +152,18 @@ export default function App() {
     return () => window.removeEventListener("wheel", onWheel);
   }, [controller, bpmStep]);
 
-  // Metronome sync: when enabled and listening, route playback starts (and loop
-  // restarts) to begin on the next detected beat.
-  const { setPlayScheduler, setSyncLoop } = controller;
+  // Metronome sync: when enabled and listening, supply the delay that aligns each
+  // start (and loop restart) to the next detected beat. Returns the ms delay, null
+  // when sync is on but no beat has been heard yet (the controller then waits), or
+  // undefined when sync is off (start immediately).
+  const { setSyncDelay, setSyncLoop } = controller;
   const { msToNextBeat } = tempoSync;
   const listening = tempoSync.state.listening;
   useEffect(() => {
     const active = syncEnabled && listening;
-    setPlayScheduler((doPlay) => {
-      if (active) {
-        const delay = msToNextBeat();
-        if (delay != null) {
-          window.setTimeout(doPlay, delay);
-          return;
-        }
-      }
-      doPlay();
-    });
+    setSyncDelay((allowImmediate) => (active ? msToNextBeat(allowImmediate) : undefined));
     setSyncLoop(active);
-  }, [setPlayScheduler, setSyncLoop, msToNextBeat, syncEnabled, listening]);
+  }, [setSyncDelay, setSyncLoop, msToNextBeat, syncEnabled, listening]);
 
   // Keyboard shortcuts.
   useEffect(() => {

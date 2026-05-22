@@ -336,6 +336,22 @@ textarea {
   color: #1a1500;
 }
 
+/* Throbber shown on the play button while sync waits for a metronome beat. */
+.spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: dt-spin 0.7s linear infinite;
+}
+@keyframes dt-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ---------- Score area ---------- */
 .score-area {
   position: relative;

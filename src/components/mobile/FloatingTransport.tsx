@@ -65,9 +65,15 @@ export default function FloatingTransport({ controller }: Props) {
         <button
           className="fab fab--lg fab--primary"
           onClick={controller.playPause}
-          title="Play / Pause"
+          title={state.awaitingBeat ? "Waiting for the metronome beat" : "Play / Pause"}
         >
-          {state.playing ? <PauseIcon /> : <PlayIcon />}
+          {state.awaitingBeat ? (
+            <span className="spinner" />
+          ) : state.playing ? (
+            <PauseIcon />
+          ) : (
+            <PlayIcon />
+          )}
         </button>
         <button className="fab fab--lg" onClick={controller.stop} title="Stop">
           <StopIcon />

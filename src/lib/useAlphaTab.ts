@@ -36,6 +36,8 @@ export interface AlphaTabState {
   speed: number;
   looping: boolean;
   hasSelection: boolean;
+  // Sync is on and we're holding playback until the next metronome beat is heard.
+  awaitingBeat: boolean;
   // Mobile two-tap loop selection is armed (tap a start beat, then an end beat).
   tapSelecting: boolean;
   snapToBar: boolean;
@@ -65,6 +67,7 @@ const initialState: AlphaTabState = {
   speed: 1,
   looping: false,
   hasSelection: false,
+  awaitingBeat: false,
   tapSelecting: false,
   snapToBar: false,
   metronome: false,
@@ -101,7 +104,7 @@ export interface AlphaTabController {
   setTrackSolo: (index: number, soloed: boolean) => void;
   setTrackVolume: (index: number, volume: number) => void;
   renderTracks: (indexes: number[]) => void;
-  setPlayScheduler: (fn: (doPlay: () => void) => void) => void;
+  setSyncDelay: (fn: (allowImmediate: boolean) => number | null | undefined) => void;
   setSyncLoop: (enabled: boolean) => void;
 }
 
@@ -133,12 +136,79 @@ export function useAlphaTab(): AlphaTabController {
   const findHintRef = useRef<unknown>(null);
   // Metronome-sync: when on, plays/loop-restarts are deferred to the next beat.
   const syncLoopRef = useRef(false);
-  // Wraps a "start playback" so App can delay it to the next metronome beat.
-  const playSchedulerRef = useRef<(doPlay: () => void) => void>((doPlay) => doPlay());
+  // Sync timing source (set by App): returns ms to delay the start so it lands on
+  // the next metronome beat, `null` when sync is on but no beat has been heard yet
+  // (so we wait), or `undefined` when sync is off (start immediately).
+  const syncDelayRef = useRef<(allowImmediate: boolean) => number | null | undefined>(
+    () => undefined
+  );
+  // Pending (not-yet-fired) sync-aligned start, so it can be cancelled on stop.
+  const pendingStartRef = useRef<{ poll?: number; timer?: number }>({});
 
   const patch = useCallback((p: Partial<AlphaTabState>) => {
     setState((s) => ({ ...s, ...p }));
   }, []);
+
+  const clearPendingStart = useCallback(() => {
+    const p = pendingStartRef.current;
+    if (p.poll != null) window.clearInterval(p.poll);
+    if (p.timer != null) window.clearTimeout(p.timer);
+    pendingStartRef.current = {};
+    setState((s) => (s.awaitingBeat ? { ...s, awaitingBeat: false } : s));
+  }, []);
+
+  // Snap the cursor to the song's nearest beat boundary so the song's beat grid can
+  // line up with the metronome (aligning only the start instant isn't enough if the
+  // cursor sits mid-beat). Beat length is the bar's tick span / its beat count.
+  const snapToBeat = useCallback(() => {
+    const api = apiRef.current;
+    const bars = api?.score?.masterBars;
+    if (!api || !bars || bars.length === 0) return;
+    const tick = api.tickPosition;
+    let i = 0;
+    while (i + 1 < bars.length && bars[i + 1].start <= tick) i++;
+    const bar = bars[i];
+    const barEnd = i + 1 < bars.length ? bars[i + 1].start : api.endTick;
+    const beats = bar.timeSignatureNumerator || 4;
+    const span = barEnd - bar.start;
+    if (span <= 0 || beats <= 0) return;
+    const ticksPerBeat = span / beats;
+    const idx = Math.round((tick - bar.start) / ticksPerBeat);
+    api.tickPosition = Math.round(bar.start + idx * ticksPerBeat);
+  }, []);
+
+  // Start playback, deferring to the metronome beat when sync is on. `snap` aligns
+  // the cursor to a beat first (used for fresh plays, not loop restarts whose start
+  // position is already fixed). If sync is on but no beat has been heard, we poll
+  // until one arrives instead of starting unsynced.
+  const scheduleStart = useCallback(
+    (doStart: () => void, snap: boolean) => {
+      clearPendingStart();
+      const compute = syncDelayRef.current;
+      // Loop restarts (snap == false) may fire immediately when on the beat; fresh
+      // plays always wait for the next beat for a consistent landing.
+      const allowImmediate = !snap;
+      const first = compute(allowImmediate);
+      if (first === undefined) {
+        doStart(); // sync off: start immediately
+        return;
+      }
+      if (snap) snapToBeat();
+      const fire = () => {
+        const delay = compute(allowImmediate);
+        if (delay == null) return; // no beat yet: keep waiting
+        clearPendingStart();
+        pendingStartRef.current.timer = window.setTimeout(doStart, delay);
+      };
+      if (first == null) {
+        patch({ awaitingBeat: true }); // sync on, no beat yet: hold and show a throbber
+        pendingStartRef.current.poll = window.setInterval(fire, 100);
+      } else {
+        pendingStartRef.current.timer = window.setTimeout(doStart, first);
+      }
+    },
+    [clearPendingStart, snapToBeat, patch]
+  );
 
   // Native (seamless) looping is used only for modes 0/1 with sync off. For count-in
   // mode 2, or when metronome-sync is on, we loop manually (see playerFinished) so a
@@ -355,7 +425,7 @@ export function useAlphaTab(): AlphaTabController {
     api.playerFinished.on(() => {
       if (!loopingRef.current) return;
       if (countInModeRef.current !== 2 && !syncLoopRef.current) return;
-      playSchedulerRef.current(() => {
+      scheduleStart(() => {
         const a = apiRef.current;
         if (!a) return;
         a.stop();
@@ -373,7 +443,7 @@ export function useAlphaTab(): AlphaTabController {
             a2.countInVolume = v;
           }
         });
-      });
+      }, false);
     });
 
     // Re-apply a previously chosen audio output device once the player is ready.
@@ -438,17 +508,23 @@ export function useAlphaTab(): AlphaTabController {
   // Starting playback goes through the scheduler (so metronome-sync can delay it to
   // the next beat); pausing is always immediate.
   const play = useCallback(() => {
-    playSchedulerRef.current(() => apiRef.current?.play());
-  }, []);
+    scheduleStart(() => apiRef.current?.play(), true);
+  }, [scheduleStart]);
   const playPause = useCallback(() => {
     if (playingRef.current) apiRef.current?.playPause();
-    else playSchedulerRef.current(() => apiRef.current?.playPause());
-  }, []);
-  const stop = useCallback(() => apiRef.current?.stop(), []);
+    else scheduleStart(() => apiRef.current?.playPause(), true);
+  }, [scheduleStart]);
+  const stop = useCallback(() => {
+    clearPendingStart(); // drop any pending sync-aligned start
+    apiRef.current?.stop();
+  }, [clearPendingStart]);
 
-  const setPlayScheduler = useCallback((fn: (doPlay: () => void) => void) => {
-    playSchedulerRef.current = fn;
-  }, []);
+  const setSyncDelay = useCallback(
+    (fn: (allowImmediate: boolean) => number | null | undefined) => {
+      syncDelayRef.current = fn;
+    },
+    []
+  );
 
   // Enable/disable beat-aligned looping (App turns this on when sync mode + listening).
   const setSyncLoop = useCallback((enabled: boolean) => {
@@ -681,7 +757,7 @@ export function useAlphaTab(): AlphaTabController {
     setTrackSolo,
     setTrackVolume,
     renderTracks,
-    setPlayScheduler,
+    setSyncDelay,
     setSyncLoop,
   };
 }
