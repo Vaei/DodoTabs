@@ -341,7 +341,7 @@ export default function App() {
             />
           </aside>
         )}
-        <ScoreView controller={controller} onOpenFile={quickOpen} />
+        <ScoreView controller={controller} onOpenFile={quickOpen} mobile={mobile} />
       </div>
 
       {mobile ? (

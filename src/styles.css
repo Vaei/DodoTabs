@@ -1573,6 +1573,9 @@ body.is-mobile textarea {
 .app--mobile .score-viewport {
   padding: 14px;
   padding-bottom: 156px;
+  /* Keep one-finger scrolling but disable the browser's own pinch-zoom so our
+     two-finger handler drives alphaTab's zoom (and the screen stops flickering). */
+  touch-action: pan-x pan-y;
 }
 
 /* Drawers (shared scrim) */
