@@ -10,6 +10,11 @@ export interface AudioDeviceInfo {
 
 const OUTPUT_DEVICE_KEY = "dodotabs.outputDevice";
 export const COUNT_IN_FULL_SPEED_KEY = "dodotabs.countInFullSpeed";
+export const TAB_ONLY_KEY = "dodotabs.tabOnly";
+export const TRACK_WHITELIST_KEY = "dodotabs.trackWhitelist";
+export const TRACK_BLACKLIST_KEY = "dodotabs.trackBlacklist";
+export const DRUM_GLYPHS_KEY = "dodotabs.drumGlyphs";
+export const BAR_STRETCH_KEY = "dodotabs.barStretch";
 
 export interface TrackInfo {
   index: number;
@@ -106,6 +111,10 @@ export interface AlphaTabController {
   setTrackSolo: (index: number, soloed: boolean) => void;
   setTrackVolume: (index: number, volume: number) => void;
   renderTracks: (indexes: number[]) => void;
+  setTabOnly: (tabOnly: boolean) => void;
+  setBarStretch: (stretch: number) => void;
+  applyTrackFilter: () => void;
+  applyDrumGlyphs: () => void;
   setSyncDelay: (fn: (allowImmediate: boolean) => number | null | undefined) => void;
   setSyncLoop: (enabled: boolean) => void;
 }
@@ -274,6 +283,80 @@ export function useAlphaTab(): AlphaTabController {
     }
   }, []);
 
+  // Show only the tablature staff (hide standard notation), or restore the default.
+  const setTabOnly = useCallback((tabOnly: boolean) => {
+    const api = apiRef.current;
+    if (!api) return;
+    api.settings.display.staveProfile = tabOnly
+      ? alphaTab.StaveProfile.Tab
+      : alphaTab.StaveProfile.Default;
+    api.updateSettings();
+    api.render();
+  }, []);
+
+  // Bar width: alphaTab's stretchForce controls how wide bars are laid out.
+  const setBarStretch = useCallback((stretch: number) => {
+    const api = apiRef.current;
+    if (!api) return;
+    api.settings.display.stretchForce = stretch;
+    api.updateSettings();
+    api.render();
+  }, []);
+
+  // Show drum/percussion staves as standard (glyph) notation even in tab-only mode,
+  // since drums have no tablature. Off restores alphaTab's default for those staves.
+  const applyDrumGlyphs = useCallback(() => {
+    const api = apiRef.current;
+    const score = api?.score;
+    if (!api || !score) return;
+    const show = (localStorage.getItem(DRUM_GLYPHS_KEY) ?? "1") !== "0";
+    let changed = false;
+    for (const track of score.tracks) {
+      for (const staff of track.staves) {
+        if (staff.isPercussion && staff.showStandardNotation !== show) {
+          staff.showStandardNotation = show;
+          changed = true;
+        }
+      }
+    }
+    if (changed) api.render();
+  }, []);
+
+  // Show/hide tracks by name using the whitelist/blacklist settings. A track is shown
+  // only if it matches the (non-empty) whitelist and doesn't match the blacklist;
+  // hidden tracks are removed from the sheet and muted. Never blanks the sheet.
+  const applyTrackFilter = useCallback(() => {
+    const api = apiRef.current;
+    const score = api?.score;
+    if (!api || !score) return;
+    const parse = (key: string) =>
+      (localStorage.getItem(key) || "")
+        .split(",")
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean);
+    const white = parse(TRACK_WHITELIST_KEY);
+    const black = parse(TRACK_BLACKLIST_KEY);
+    const shown = (name: string) => {
+      const n = name.toLowerCase();
+      if (white.length && !white.some((w) => n.includes(w))) return false;
+      if (black.length && black.some((b) => n.includes(b))) return false;
+      return true;
+    };
+    let visible = score.tracks.filter((t) => shown(t.name ?? ""));
+    if (visible.length === 0) visible = score.tracks; // an all-hiding filter shows all
+    const visibleIdx = new Set(visible.map((t) => t.index));
+    api.renderTracks(visible);
+    for (const t of score.tracks) api.changeTrackMute([t], !visibleIdx.has(t.index));
+    setState((s) => ({
+      ...s,
+      tracks: s.tracks.map((t) => ({
+        ...t,
+        rendered: visibleIdx.has(t.index),
+        muted: !visibleIdx.has(t.index),
+      })),
+    }));
+  }, []);
+
   useEffect(() => {
     if (!containerRef.current || !viewportRef.current) return;
 
@@ -285,6 +368,14 @@ export function useAlphaTab(): AlphaTabController {
     settings.importer.beatTextAsLyrics = true;
     settings.display.layoutMode = alphaTab.LayoutMode.Page;
     settings.display.scale = 1;
+    // Tab-only and bar-width (stretchForce) preferences applied at first render.
+    if ((localStorage.getItem(TAB_ONLY_KEY) ?? "0") !== "0") {
+      settings.display.staveProfile = alphaTab.StaveProfile.Tab;
+    }
+    {
+      const stretch = Number.parseFloat(localStorage.getItem(BAR_STRETCH_KEY) ?? "1");
+      if (Number.isFinite(stretch) && stretch > 0) settings.display.stretchForce = stretch;
+    }
 
     // Render notation in light ink for the dark themed sheet.
     const res = settings.display.resources;
@@ -343,6 +434,9 @@ export function useAlphaTab(): AlphaTabController {
         hasSelection: false,
         looping: false,
       });
+      // Apply the per-song display preferences once the new score is in.
+      applyDrumGlyphs();
+      applyTrackFilter();
     });
 
     // Drag-selecting a section on the score sets a playback range (alphaTab built-in).
@@ -846,6 +940,10 @@ export function useAlphaTab(): AlphaTabController {
     setZoom,
     setLayout,
     setTrackMute,
+    setTabOnly,
+    setBarStretch,
+    applyTrackFilter,
+    applyDrumGlyphs,
     setTrackSolo,
     setTrackVolume,
     renderTracks,

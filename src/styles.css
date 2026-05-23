@@ -1081,6 +1081,20 @@ textarea {
   outline: none;
   border-color: var(--accent);
 }
+.settings-text {
+  width: 180px;
+  height: 36px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  padding: 0 10px;
+  font-size: 14px;
+}
+.settings-text:focus {
+  outline: none;
+  border-color: var(--accent);
+}
 .settings-unit {
   color: var(--muted);
   font-size: 13px;

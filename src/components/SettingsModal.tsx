@@ -1,8 +1,15 @@
 import { useEffect, useState } from "react";
 import type { AlphaTabController, AudioDeviceInfo } from "../lib/useAlphaTab";
-import { COUNT_IN_FULL_SPEED_KEY } from "../lib/useAlphaTab";
+import {
+  COUNT_IN_FULL_SPEED_KEY,
+  TAB_ONLY_KEY,
+  DRUM_GLYPHS_KEY,
+  BAR_STRETCH_KEY,
+  TRACK_WHITELIST_KEY,
+  TRACK_BLACKLIST_KEY,
+} from "../lib/useAlphaTab";
 import { KEEP_SCREEN_ON_KEY } from "../lib/useKeepAwake";
-import { METRONOME_SYNC } from "../lib/constants";
+import { AUTO_LOAD_LAST_KEY, METRONOME_SYNC } from "../lib/constants";
 import { CloseIcon } from "./Icons";
 
 interface Props {
@@ -44,6 +51,43 @@ export default function SettingsModal({
   const [keepScreenOn, setKeepScreenOn] = useState(
     () => (localStorage.getItem(KEEP_SCREEN_ON_KEY) ?? "1") !== "0"
   );
+  const [tabOnly, setTabOnlyState] = useState(
+    () => (localStorage.getItem(TAB_ONLY_KEY) ?? "0") !== "0"
+  );
+  const [drumGlyphs, setDrumGlyphsState] = useState(
+    () => (localStorage.getItem(DRUM_GLYPHS_KEY) ?? "1") !== "0"
+  );
+  const [barStretch, setBarStretchState] = useState(() => {
+    const v = Number.parseFloat(localStorage.getItem(BAR_STRETCH_KEY) ?? "1");
+    return Number.isFinite(v) && v > 0 ? v : 1;
+  });
+  const [autoLoadLast, setAutoLoadLastState] = useState(
+    () => (localStorage.getItem(AUTO_LOAD_LAST_KEY) ?? "1") !== "0"
+  );
+  const changeAutoLoadLast = (v: boolean) => {
+    setAutoLoadLastState(v);
+    localStorage.setItem(AUTO_LOAD_LAST_KEY, v ? "1" : "0");
+  };
+
+  const changeTabOnly = (v: boolean) => {
+    setTabOnlyState(v);
+    localStorage.setItem(TAB_ONLY_KEY, v ? "1" : "0");
+    controller.setTabOnly(v);
+  };
+  const changeDrumGlyphs = (v: boolean) => {
+    setDrumGlyphsState(v);
+    localStorage.setItem(DRUM_GLYPHS_KEY, v ? "1" : "0");
+    controller.applyDrumGlyphs();
+  };
+  const changeBarStretch = (v: number) => {
+    setBarStretchState(v);
+    localStorage.setItem(BAR_STRETCH_KEY, String(v));
+    controller.setBarStretch(v);
+  };
+  const changeTrackList = (key: string, value: string) => {
+    localStorage.setItem(key, value);
+    controller.applyTrackFilter();
+  };
 
   const changeSyncOffset = (v: number) => {
     setSyncOffset(v);
@@ -121,6 +165,18 @@ export default function SettingsModal({
             <CloseIcon />
           </button>
         </header>
+
+        <section className="modal__section">
+          <h3>Startup</h3>
+          <label className="settings-row">
+            <span>Reopen the last tab on startup</span>
+            <input
+              type="checkbox"
+              checked={autoLoadLast}
+              onChange={(e) => changeAutoLoadLast(e.target.checked)}
+            />
+          </label>
+        </section>
 
         <section className="modal__section">
           <h3>Playback</h3>
@@ -224,6 +280,69 @@ export default function SettingsModal({
               </p>
             </>
           )}
+        </section>
+
+        <section className="modal__section">
+          <h3>Notation</h3>
+          <label className="settings-row">
+            <span>Show tab only (hide notation staff)</span>
+            <input
+              type="checkbox"
+              checked={tabOnly}
+              onChange={(e) => changeTabOnly(e.target.checked)}
+            />
+          </label>
+          <label className="settings-row">
+            <span>Show drum glyphs (percussion notation)</span>
+            <input
+              type="checkbox"
+              checked={drumGlyphs}
+              onChange={(e) => changeDrumGlyphs(e.target.checked)}
+            />
+          </label>
+          <label className="settings-row">
+            <span>Bar width</span>
+            <span className="settings-inline">
+              <input
+                type="range"
+                min={0.5}
+                max={2.5}
+                step={0.1}
+                value={barStretch}
+                onChange={(e) => changeBarStretch(Number(e.target.value))}
+                onMouseDown={(e) => {
+                  if (e.button === 1) {
+                    e.preventDefault();
+                    changeBarStretch(1);
+                  }
+                }}
+              />
+              <span className="settings-unit settings-unit--wide">{barStretch.toFixed(1)}x</span>
+            </span>
+          </label>
+          <label className="settings-row">
+            <span>Only show tracks containing</span>
+            <input
+              className="settings-text"
+              type="text"
+              defaultValue={localStorage.getItem(TRACK_WHITELIST_KEY) ?? ""}
+              placeholder="e.g. guitar, bass"
+              onBlur={(e) => changeTrackList(TRACK_WHITELIST_KEY, e.target.value)}
+            />
+          </label>
+          <label className="settings-row">
+            <span>Hide tracks containing</span>
+            <input
+              className="settings-text"
+              type="text"
+              defaultValue={localStorage.getItem(TRACK_BLACKLIST_KEY) ?? ""}
+              placeholder="e.g. drums, vocals"
+              onBlur={(e) => changeTrackList(TRACK_BLACKLIST_KEY, e.target.value)}
+            />
+          </label>
+          <p className="settings-note">
+            Track filters match track names (comma-separated). Hidden tracks are muted too.
+          </p>
         </section>
 
         <section className="modal__section">

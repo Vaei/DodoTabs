@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAlphaTab } from "./lib/useAlphaTab";
 import { useTempoSync } from "./lib/useTempoSync";
-import { METRONOME_SYNC, SPEEDS, ZOOMS, stepPreset } from "./lib/constants";
+import { AUTO_LOAD_LAST_KEY, METRONOME_SYNC, SPEEDS, ZOOMS, stepPreset } from "./lib/constants";
 import ScoreView from "./components/ScoreView";
 import TransportBar from "./components/TransportBar";
 import TrackSidebar from "./components/TrackSidebar";
@@ -115,6 +115,16 @@ export default function App() {
     },
     [handleOpen]
   );
+
+  // Auto-load the most recently opened tab on startup (on by default).
+  const didAutoLoadRef = useRef(false);
+  useEffect(() => {
+    if (didAutoLoadRef.current) return;
+    didAutoLoadRef.current = true;
+    if ((localStorage.getItem(AUTO_LOAD_LAST_KEY) ?? "1") === "0") return;
+    const last = loadRecents()[0];
+    if (last) openRecent(last);
+  }, [openRecent]);
 
   const clearRecents = useCallback(() => setRecents(clearRecentsStore()), []);
 
