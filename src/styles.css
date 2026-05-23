@@ -1567,6 +1567,13 @@ body.is-mobile textarea {
 
 /* Tracks: horizontal scrolling strip (portrait); left-edge drawer (landscape). */
 @media (orientation: portrait) {
+  /* The top-drawer actions (mic/Library) never fit on the menu row in portrait and
+     wrap awkwardly; give them their own centered row instead. */
+  .top-drawer__actions {
+    flex-basis: 100%;
+    margin-left: 0;
+    justify-content: center;
+  }
   .tracks-drawer {
     flex: 0 0 auto;
     background: var(--panel);
