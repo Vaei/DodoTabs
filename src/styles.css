@@ -1602,26 +1602,34 @@ body.is-mobile textarea {
     flex: 0 0 auto;
     background: var(--panel);
     border-bottom: 1px solid var(--border);
-    overflow-x: auto;
-    overflow-y: hidden;
   }
   .tracks-drawer__handle,
   .drawer-scrim--tracks {
     display: none;
   }
-  /* Flatten the wrappers so the track cards scroll horizontally as one row. */
-  .tracks-drawer__body,
-  .tracks-drawer .tracks {
+  /* Flatten the body wrapper; .tracks stays a column: a compact header (just the
+     mute-all button) above the horizontally scrolling card strip. */
+  .tracks-drawer__body {
     display: contents;
   }
+  .tracks-drawer .tracks {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
   .tracks-drawer .tracks__header {
-    display: none;
+    justify-content: flex-end;
+    padding: 6px 10px;
+  }
+  .tracks-drawer .tracks__header > span {
+    display: none; /* hide the "Tracks" label; keep the mute-all button */
   }
   .tracks-drawer .tracks__list {
     flex-direction: row;
     gap: 8px;
     padding: 8px;
-    width: max-content;
+    overflow-x: auto;
+    overflow-y: hidden;
   }
   .tracks-drawer .track {
     width: 188px;
