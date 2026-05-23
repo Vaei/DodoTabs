@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAlphaTab } from "./lib/useAlphaTab";
 import { useTempoSync } from "./lib/useTempoSync";
-import { SPEEDS, ZOOMS, stepPreset } from "./lib/constants";
+import { METRONOME_SYNC, SPEEDS, ZOOMS, stepPreset } from "./lib/constants";
 import ScoreView from "./components/ScoreView";
 import TransportBar from "./components/TransportBar";
 import TrackSidebar from "./components/TrackSidebar";
@@ -313,13 +313,15 @@ export default function App() {
           {!state.soundFontReady && state.scoreLoaded && (
             <span className="topbar__loading">loading sounds…</span>
           )}
-          <button
-            className={`btn ${tempoSync.state.listening ? "btn--active" : ""}`}
-            onClick={() => setTempoOpen(true)}
-            title="Play in time with a metronome (mic)"
-          >
-            <MicIcon />
-          </button>
+          {METRONOME_SYNC && (
+            <button
+              className={`btn ${tempoSync.state.listening ? "btn--active" : ""}`}
+              onClick={() => setTempoOpen(true)}
+              title="Play in time with a metronome (mic)"
+            >
+              <MicIcon />
+            </button>
+          )}
           <button className="btn btn--primary" onClick={() => setLibraryOpen(true)}>
             <FolderIcon />
             <span>Library</span>
@@ -417,7 +419,9 @@ export default function App() {
 
       {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
 
-      {tempoOpen && <TempoSyncModal sync={tempoSync} onClose={() => setTempoOpen(false)} />}
+      {METRONOME_SYNC && tempoOpen && (
+        <TempoSyncModal sync={tempoSync} onClose={() => setTempoOpen(false)} />
+      )}
     </div>
   );
 }

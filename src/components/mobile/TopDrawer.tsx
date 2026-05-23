@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { RecentEntry } from "../../lib/recents";
 import { useDrawerHandle } from "../../lib/useDrawerHandle";
 import FileMenu from "../FileMenu";
+import { METRONOME_SYNC } from "../../lib/constants";
 import { FolderIcon, MicIcon, HistoryIcon, ChevronDownIcon } from "../Icons";
 
 interface Props {
@@ -100,16 +101,18 @@ export default function TopDrawer({
             </button>
           </nav>
           <div className="top-drawer__actions">
-            <button
-              className={`btn ${micActive ? "btn--active" : ""}`}
-              onClick={() => {
-                close();
-                onOpenMic();
-              }}
-              title="Play in time with a metronome (mic)"
-            >
-              <MicIcon />
-            </button>
+            {METRONOME_SYNC && (
+              <button
+                className={`btn ${micActive ? "btn--active" : ""}`}
+                onClick={() => {
+                  close();
+                  onOpenMic();
+                }}
+                title="Play in time with a metronome (mic)"
+              >
+                <MicIcon />
+              </button>
+            )}
             <button
               className="btn btn--primary"
               onClick={() => {

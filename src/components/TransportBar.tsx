@@ -1,6 +1,6 @@
 import { useCallback, useRef } from "react";
 import type { AlphaTabController } from "../lib/useAlphaTab";
-import { ZOOMS } from "../lib/constants";
+import { METRONOME_SYNC, ZOOMS } from "../lib/constants";
 import SpeedControl from "./SpeedControl";
 import BpmControl from "./BpmControl";
 import { ChevronLeftIcon } from "./Icons";
@@ -73,20 +73,22 @@ export default function TransportBar({
       </div>
 
       <div className="transport__controls">
-        <div className="transport__group">
-          <button
-            className={`btn btn--wide ${syncEnabled && syncAvailable ? "btn--active" : ""}`}
-            onClick={() => (syncAvailable ? onToggleSync() : onOpenMic())}
-            title={
-              syncAvailable
-                ? "Sync to metronome: start playback (and each loop) on the beat"
-                : "Open the metronome mic dialog and start listening"
-            }
-          >
-            <MicIcon width={16} height={16} />
-            <span>Sync</span>
-          </button>
-        </div>
+        {METRONOME_SYNC && (
+          <div className="transport__group">
+            <button
+              className={`btn btn--wide ${syncEnabled && syncAvailable ? "btn--active" : ""}`}
+              onClick={() => (syncAvailable ? onToggleSync() : onOpenMic())}
+              title={
+                syncAvailable
+                  ? "Sync to metronome: start playback (and each loop) on the beat"
+                  : "Open the metronome mic dialog and start listening"
+              }
+            >
+              <MicIcon width={16} height={16} />
+              <span>Sync</span>
+            </button>
+          </div>
+        )}
 
         <div className="transport__group">
           <button

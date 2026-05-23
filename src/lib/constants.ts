@@ -4,6 +4,11 @@ export const APP_AUTHOR = "Jared Taylor";
 export const GITHUB_URL = "https://github.com/Vaei/DodoTabs";
 export const APP_LICENSE = "AGPL-3.0";
 
+// Metronome (mic) sync isn't reliable yet, so its UI is hidden. The feature and all
+// its code remain; flip this to true to surface the mic button, Sync toggle and the
+// related settings again.
+export const METRONOME_SYNC = false;
+
 export interface LicenseEntry {
   name: string;
   license: string;

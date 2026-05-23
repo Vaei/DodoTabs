@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AlphaTabController } from "../../lib/useAlphaTab";
-import { ZOOMS } from "../../lib/constants";
+import { METRONOME_SYNC, ZOOMS } from "../../lib/constants";
 import { useDrawerHandle } from "../../lib/useDrawerHandle";
 import SpeedControl from "../SpeedControl";
 import BpmControl from "../BpmControl";
@@ -72,18 +72,20 @@ export default function BottomDrawer({
             </button>
           )}
 
-          <button
-            className={`btn btn--wide bottom-sync ${syncEnabled && syncAvailable ? "btn--active" : ""}`}
-            onClick={() => (syncAvailable ? onToggleSync() : onOpenMic())}
-            title={
-              syncAvailable
-                ? "Sync to metronome: start playback (and each loop) on the beat"
-                : "Open the metronome mic dialog and start listening"
-            }
-          >
-            <MicIcon width={16} height={16} />
-            <span>Sync to metronome</span>
-          </button>
+          {METRONOME_SYNC && (
+            <button
+              className={`btn btn--wide bottom-sync ${syncEnabled && syncAvailable ? "btn--active" : ""}`}
+              onClick={() => (syncAvailable ? onToggleSync() : onOpenMic())}
+              title={
+                syncAvailable
+                  ? "Sync to metronome: start playback (and each loop) on the beat"
+                  : "Open the metronome mic dialog and start listening"
+              }
+            >
+              <MicIcon width={16} height={16} />
+              <span>Sync to metronome</span>
+            </button>
+          )}
 
           <div className="bottom-drawer__row">
             <SpeedControl value={state.speed} disabled={disabled} onChange={controller.setSpeed} />

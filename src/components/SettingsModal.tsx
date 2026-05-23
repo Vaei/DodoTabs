@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { AlphaTabController, AudioDeviceInfo } from "../lib/useAlphaTab";
 import { COUNT_IN_FULL_SPEED_KEY } from "../lib/useAlphaTab";
 import { KEEP_SCREEN_ON_KEY } from "../lib/useKeepAwake";
+import { METRONOME_SYNC } from "../lib/constants";
 import { CloseIcon } from "./Icons";
 
 interface Props {
@@ -195,30 +196,34 @@ export default function SettingsModal({
               onChange={(e) => changeKeepScreenOn(e.target.checked)}
             />
           </label>
-          <label className="settings-row">
-            <span>Tempo-sync offset</span>
-            <span className="settings-inline">
-              <input
-                type="range"
-                min={-200}
-                max={200}
-                step={5}
-                value={syncOffset}
-                onChange={(e) => changeSyncOffset(Number(e.target.value))}
-                onMouseDown={(e) => {
-                  if (e.button === 1) {
-                    e.preventDefault();
-                    changeSyncOffset(0);
-                  }
-                }}
-              />
-              <span className="settings-unit settings-unit--wide">{syncOffset} ms</span>
-            </span>
-          </label>
-          <p className="settings-note">
-            Adjusts when "Play on the beat" starts, to compensate for mic/output latency.
-            Positive starts the song later; negative earlier.
-          </p>
+          {METRONOME_SYNC && (
+            <>
+              <label className="settings-row">
+                <span>Tempo-sync offset</span>
+                <span className="settings-inline">
+                  <input
+                    type="range"
+                    min={-200}
+                    max={200}
+                    step={5}
+                    value={syncOffset}
+                    onChange={(e) => changeSyncOffset(Number(e.target.value))}
+                    onMouseDown={(e) => {
+                      if (e.button === 1) {
+                        e.preventDefault();
+                        changeSyncOffset(0);
+                      }
+                    }}
+                  />
+                  <span className="settings-unit settings-unit--wide">{syncOffset} ms</span>
+                </span>
+              </label>
+              <p className="settings-note">
+                Adjusts when "Play on the beat" starts, to compensate for mic/output latency.
+                Positive starts the song later; negative earlier.
+              </p>
+            </>
+          )}
         </section>
 
         <section className="modal__section">
@@ -257,30 +262,32 @@ export default function SettingsModal({
           )}
         </section>
 
-        <section className="modal__section">
-          <h3>Microphone (input)</h3>
-          <select
-            className="settings-select"
-            value={inputId}
-            onChange={(e) => onInputChange(e.target.value)}
-          >
-            <option value="">System default</option>
-            {inputs.map((d, i) => (
-              <option key={d.deviceId || i} value={d.deviceId}>
-                {d.label || `Microphone ${i + 1}`}
-              </option>
-            ))}
-          </select>
-          {needsMicPermission && (
-            <button className="btn btn--primary settings-grant" onClick={requestMic}>
-              Grant microphone access
-            </button>
-          )}
-          <p className="settings-note">
-            Used to listen for a physical metronome in the room, to start playback in time
-            with it.
-          </p>
-        </section>
+        {METRONOME_SYNC && (
+          <section className="modal__section">
+            <h3>Microphone (input)</h3>
+            <select
+              className="settings-select"
+              value={inputId}
+              onChange={(e) => onInputChange(e.target.value)}
+            >
+              <option value="">System default</option>
+              {inputs.map((d, i) => (
+                <option key={d.deviceId || i} value={d.deviceId}>
+                  {d.label || `Microphone ${i + 1}`}
+                </option>
+              ))}
+            </select>
+            {needsMicPermission && (
+              <button className="btn btn--primary settings-grant" onClick={requestMic}>
+                Grant microphone access
+              </button>
+            )}
+            <p className="settings-note">
+              Used to listen for a physical metronome in the room, to start playback in time
+              with it.
+            </p>
+          </section>
+        )}
       </div>
     </div>
   );
