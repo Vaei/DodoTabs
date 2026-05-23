@@ -183,6 +183,9 @@ Bravura, Inter and Space Grotesk fonts (SIL OFL-1.1), and the Tauri/React stack
 
 ## Changelog
 
+### 1.0.3
+* Hid the metronome-sync feature for now (it wasn't reliable yet)
+
 ### 1.0.2
 * Landscape: tracks panel open by default and no longer dims the score
 * Landscape: smaller floating playback controls
