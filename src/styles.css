@@ -273,7 +273,8 @@ textarea {
   background: none;
   border: none;
   color: var(--text);
-  cursor: pointer;
+  cursor: default;
+  min-width: 0;
   padding: 2px;
   min-width: 0;
 }

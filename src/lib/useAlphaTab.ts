@@ -657,6 +657,28 @@ export function useAlphaTab(): AlphaTabController {
     return () => clearInterval(id);
   }, [state.playing]);
 
+  // Render only the tracks that are actually audible: with a solo active, just the
+  // soloed tracks; otherwise the non-muted ones. So muting/soloing also hides a track
+  // from the sheet. Keyed on the mute/solo signature so it ignores volume/activity
+  // churn, and only re-renders when the audible set actually changes.
+  const muteSoloSig = state.tracks.map((t) => `${t.index}:${+t.muted}:${+t.soloed}`).join("|");
+  useEffect(() => {
+    const api = apiRef.current;
+    if (!api?.score) return;
+    const tracks = state.tracks;
+    if (tracks.length === 0) return;
+    const soloed = tracks.filter((t) => t.soloed);
+    let audible = soloed.length ? soloed : tracks.filter((t) => !t.muted);
+    if (audible.length === 0) audible = tracks; // everything muted: keep the sheet visible
+    const want = new Set(audible.map((t) => t.index));
+    const have = new Set(tracks.filter((t) => t.rendered).map((t) => t.index));
+    if (want.size === have.size && [...want].every((i) => have.has(i))) return;
+    const scoreTracks = api.score.tracks.filter((t) => want.has(t.index));
+    if (scoreTracks.length) api.renderTracks(scoreTracks);
+    setState((s) => ({ ...s, tracks: s.tracks.map((t) => ({ ...t, rendered: want.has(t.index) })) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [muteSoloSig]);
+
   const loadFile = useCallback((file: LoadedFile) => {
     patch({ error: null });
     // Clear any section loop from the current song before swapping in the new one, so
