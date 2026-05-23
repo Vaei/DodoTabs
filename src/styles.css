@@ -284,9 +284,11 @@ textarea {
 }
 .track__name {
   font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* Wrap long names so the full name is always visible (no resize/hover needed,
+     which wouldn't work on touch anyway). */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.25;
 }
 .track__controls {
   grid-column: 2;

@@ -18,7 +18,9 @@ export default function TrackSidebar({ controller }: Props) {
           <div className={`track ${t.rendered ? "track--on" : ""}`} key={t.index}>
             <div className="track__main">
               <GuitarIcon className="track__icon" />
-              <span className="track__name">{t.name}</span>
+              <span className="track__name" title={t.name}>
+                {t.name}
+              </span>
             </div>
 
             <div className="track__controls">
