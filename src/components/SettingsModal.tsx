@@ -85,8 +85,9 @@ export default function SettingsModal({
     controller.setBarStretch(v);
   };
   const changeTrackList = (key: string, value: string) => {
+    // Only persist; the filter is applied when a tab is loaded, so it never disrupts
+    // the tracks you've muted/soloed in the current session.
     localStorage.setItem(key, value);
-    controller.applyTrackFilter();
   };
 
   const changeSyncOffset = (v: number) => {
