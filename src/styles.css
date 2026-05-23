@@ -159,12 +159,31 @@ textarea {
   border-bottom: 1px solid var(--border);
 }
 .tracks__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 12px 16px;
   font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
   border-bottom: 1px solid var(--border);
+}
+.tracks__muteall {
+  border: 1px solid var(--border-strong);
+  background: var(--elevated);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tracks__muteall:hover {
+  border-color: var(--accent);
 }
 .tracks__list {
   padding: 8px;

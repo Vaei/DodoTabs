@@ -108,6 +108,7 @@ export interface AlphaTabController {
   setZoom: (zoom: number) => void;
   setLayout: (layout: "page" | "horizontal") => void;
   setTrackMute: (index: number, muted: boolean) => void;
+  setAllTracksMuted: (muted: boolean) => void;
   setTrackSolo: (index: number, soloed: boolean) => void;
   setTrackVolume: (index: number, volume: number) => void;
   renderTracks: (indexes: number[]) => void;
@@ -907,6 +908,19 @@ export function useAlphaTab(): AlphaTabController {
     }));
   }, [trackByIndex]);
 
+  // Mute or unmute every track at once (also clears any solo so the result is uniform).
+  const setAllTracksMuted = useCallback((muted: boolean) => {
+    const api = apiRef.current;
+    for (const t of api?.score?.tracks ?? []) {
+      api?.changeTrackMute([t], muted);
+      api?.changeTrackSolo([t], false);
+    }
+    setState((s) => ({
+      ...s,
+      tracks: s.tracks.map((t) => ({ ...t, muted, soloed: false })),
+    }));
+  }, []);
+
   const setTrackSolo = useCallback((index: number, soloed: boolean) => {
     const track = trackByIndex(index);
     if (track) apiRef.current?.changeTrackSolo([track], soloed);
@@ -962,6 +976,7 @@ export function useAlphaTab(): AlphaTabController {
     setZoom,
     setLayout,
     setTrackMute,
+    setAllTracksMuted,
     setTabOnly,
     setBarStretch,
     applyTrackFilter,

@@ -10,12 +10,25 @@ export default function TrackSidebar({ controller }: Props) {
 
   if (!state.scoreLoaded) return null;
 
+  const anySolo = state.tracks.some((t) => t.soloed);
+  const isAudible = (t: (typeof state.tracks)[number]) => (anySolo ? t.soloed : !t.muted);
+  const allMuted = state.tracks.length > 0 && state.tracks.every((t) => t.muted);
+
   return (
     <section className="tracks">
-      <div className="tracks__header">Tracks</div>
+      <div className="tracks__header">
+        <span>Tracks</span>
+        <button
+          className="tracks__muteall"
+          onClick={() => controller.setAllTracksMuted(!allMuted)}
+          title={allMuted ? "Unmute all tracks" : "Mute all tracks"}
+        >
+          {allMuted ? "Unmute all" : "Mute all"}
+        </button>
+      </div>
       <div className="tracks__list">
         {state.tracks.map((t) => (
-          <div className={`track ${t.rendered ? "track--on" : ""}`} key={t.index}>
+          <div className={`track ${isAudible(t) ? "track--on" : ""}`} key={t.index}>
             <div className="track__main">
               <GuitarIcon className="track__icon" />
               <span className="track__name" title={t.name}>
