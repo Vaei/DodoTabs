@@ -1,5 +1,12 @@
 # DodoTabs
 
+### ⬇️ [Download the latest release](https://github.com/Vaei/DodoTabs/releases/latest)
+
+Just want to use it? Grab the latest build above — the **`_x64-setup.exe`** for Windows
+(it auto-updates itself), or the **`.apk`** to [sideload on Android](#installing-the-android-app-sideload).
+
+---
+
 A guitar-tab player built on [alphaTab](https://alphatab.net), wrapped with **Tauri v2**.
 Renders and plays back Guitar Pro / MusicXML / Capella / AlphaTex files with a dark,
 modern interface: beat-cursor following, auto-scroll, per-track mute/solo/volume,
