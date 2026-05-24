@@ -3,9 +3,10 @@ import { GuitarIcon } from "./Icons";
 
 interface Props {
   controller: AlphaTabController;
+  onToast?: (msg: string) => void;
 }
 
-export default function TrackSidebar({ controller }: Props) {
+export default function TrackSidebar({ controller, onToast }: Props) {
   const { state } = controller;
 
   if (!state.scoreLoaded) return null;
@@ -39,7 +40,10 @@ export default function TrackSidebar({ controller }: Props) {
           </button>
           <button
             className="tracks__muteall"
-            onClick={() => controller.saveTabSettings()}
+            onClick={() => {
+              controller.saveTabSettings();
+              onToast?.("Saved this tab's setup");
+            }}
             title="Save this tab's track setup, speed and zoom (restored when you reopen it)"
           >
             Save

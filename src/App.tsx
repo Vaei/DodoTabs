@@ -342,10 +342,10 @@ export default function App() {
 
       <div className="main">
         {mobile ? (
-          <TracksDrawer controller={controller} />
+          <TracksDrawer controller={controller} onToast={setNotice} />
         ) : (
           <aside className="sidebar">
-            <TrackSidebar controller={controller} />
+            <TrackSidebar controller={controller} onToast={setNotice} />
             <RecentList
               recents={recents}
               activeKey={activeKey}
