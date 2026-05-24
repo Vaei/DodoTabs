@@ -12,6 +12,7 @@
   --accent-soft: rgba(255, 138, 61, 0.16);
   --solo: #ffd24a;
   --mute: #ff5d6c;
+  --show: #4ad7ff;
   --paper: #f7f4ec;
   --radius: 10px;
   --shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
@@ -185,6 +186,10 @@ textarea {
 .tracks__muteall:hover {
   border-color: var(--accent);
 }
+.tracks__bulk {
+  display: flex;
+  gap: 6px;
+}
 .tracks__list {
   padding: 8px;
   display: flex;
@@ -356,6 +361,11 @@ textarea {
   background: var(--solo);
   border-color: var(--solo);
   color: #1a1500;
+}
+.tag--show {
+  background: var(--show);
+  border-color: var(--show);
+  color: #04222b;
 }
 
 /* Throbber shown on the play button while sync waits for a metronome beat. */
@@ -1607,27 +1617,36 @@ body.is-mobile textarea {
   .drawer-scrim--tracks {
     display: none;
   }
-  /* Flatten the body wrapper; .tracks stays a column: a compact header (just the
-     mute-all button) above the horizontally scrolling card strip. */
+  /* Flatten the body wrapper; .tracks becomes a row: the bulk action buttons stacked
+     in a left column, with the horizontally scrolling card strip to their right. */
   .tracks-drawer__body {
     display: contents;
   }
   .tracks-drawer .tracks {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    align-items: stretch;
     min-width: 0;
   }
   .tracks-drawer .tracks__header {
-    justify-content: flex-end;
-    padding: 6px 10px;
+    flex: 0 0 auto;
+    align-items: center;
+    padding: 8px 10px;
+    border-bottom: none;
+    border-right: 1px solid var(--border);
   }
   .tracks-drawer .tracks__header > span {
-    display: none; /* hide the "Tracks" label; keep the mute-all button */
+    display: none; /* hide the "Tracks" label; keep the bulk buttons */
+  }
+  .tracks-drawer .tracks__bulk {
+    flex-direction: column;
   }
   .tracks-drawer .tracks__list {
+    flex: 1;
     flex-direction: row;
     gap: 8px;
     padding: 8px;
+    min-width: 0;
     overflow-x: auto;
     overflow-y: hidden;
   }

@@ -23,6 +23,9 @@ export interface TrackInfo {
   soloed: boolean;
   volume: number; // 0..1
   rendered: boolean;
+  // Per-track sheet-display override. "auto" follows audibility (muting hides the
+  // track from the sheet); "shown"/"hidden" pin it visible/hidden regardless of mute.
+  display: "auto" | "shown" | "hidden";
   activity: number; // 0..1 live playback level (which track is sounding now)
 }
 
@@ -109,6 +112,8 @@ export interface AlphaTabController {
   setLayout: (layout: "page" | "horizontal") => void;
   setTrackMute: (index: number, muted: boolean) => void;
   setAllTracksMuted: (muted: boolean) => void;
+  setTrackDisplay: (index: number, shown: boolean) => void;
+  setAllTracksDisplay: (shown: boolean) => void;
   setTrackSolo: (index: number, soloed: boolean) => void;
   setTrackVolume: (index: number, volume: number) => void;
   renderTracks: (indexes: number[]) => void;
@@ -407,6 +412,7 @@ export function useAlphaTab(): AlphaTabController {
         soloed: false,
         volume: 1,
         rendered: true,
+        display: "auto",
         activity: 0,
       }));
       autoLoopRef.current = false;
@@ -658,27 +664,32 @@ export function useAlphaTab(): AlphaTabController {
     return () => clearInterval(id);
   }, [state.playing]);
 
-  // Render only the tracks that are actually audible: with a solo active, just the
-  // soloed tracks; otherwise the non-muted ones. So muting/soloing also hides a track
-  // from the sheet. Keyed on the mute/solo signature so it ignores volume/activity
-  // churn, and only re-renders when the audible set actually changes.
-  const muteSoloSig = state.tracks.map((t) => `${t.index}:${+t.muted}:${+t.soloed}`).join("|");
+  // Decide which tracks appear on the sheet. By default it follows audibility (with a
+  // solo active, just the soloed tracks; otherwise the non-muted ones — so muting also
+  // hides a track), but a per-track "display" override pins a track shown or hidden
+  // regardless of mute. Keyed on the mute/solo/display signature so it ignores
+  // volume/activity churn, and only re-renders when the displayed set actually changes.
+  const displaySig = state.tracks
+    .map((t) => `${t.index}:${+t.muted}:${+t.soloed}:${t.display}`)
+    .join("|");
   useEffect(() => {
     const api = apiRef.current;
     if (!api?.score) return;
     const tracks = state.tracks;
     if (tracks.length === 0) return;
-    const soloed = tracks.filter((t) => t.soloed);
-    let audible = soloed.length ? soloed : tracks.filter((t) => !t.muted);
-    if (audible.length === 0) audible = tracks; // everything muted: keep the sheet visible
-    const want = new Set(audible.map((t) => t.index));
+    const anySolo = tracks.some((t) => t.soloed);
+    const audible = (t: TrackInfo) => (anySolo ? t.soloed : !t.muted);
+    const displayed = (t: TrackInfo) =>
+      t.display === "shown" ? true : t.display === "hidden" ? false : audible(t);
+    let want = new Set(tracks.filter(displayed).map((t) => t.index));
+    if (want.size === 0) want = new Set(tracks.map((t) => t.index)); // keep the sheet visible
     const have = new Set(tracks.filter((t) => t.rendered).map((t) => t.index));
     if (want.size === have.size && [...want].every((i) => have.has(i))) return;
     const scoreTracks = api.score.tracks.filter((t) => want.has(t.index));
     if (scoreTracks.length) api.renderTracks(scoreTracks);
     setState((s) => ({ ...s, tracks: s.tracks.map((t) => ({ ...t, rendered: want.has(t.index) })) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [muteSoloSig]);
+  }, [displaySig]);
 
   const loadFile = useCallback((file: LoadedFile) => {
     patch({ error: null });
@@ -921,6 +932,25 @@ export function useAlphaTab(): AlphaTabController {
     }));
   }, []);
 
+  // Pin a track shown/hidden on the sheet, overriding the audibility-based default.
+  const setTrackDisplay = useCallback((index: number, shown: boolean) => {
+    setState((s) => ({
+      ...s,
+      tracks: s.tracks.map((t) =>
+        t.index === index ? { ...t, display: shown ? "shown" : "hidden" } : t
+      ),
+    }));
+  }, []);
+
+  // Pin every track shown or hidden on the sheet at once (the displaySig effect then
+  // reconciles what's rendered).
+  const setAllTracksDisplay = useCallback((shown: boolean) => {
+    setState((s) => ({
+      ...s,
+      tracks: s.tracks.map((t) => ({ ...t, display: shown ? "shown" : "hidden" })),
+    }));
+  }, []);
+
   const setTrackSolo = useCallback((index: number, soloed: boolean) => {
     const track = trackByIndex(index);
     if (track) apiRef.current?.changeTrackSolo([track], soloed);
@@ -977,6 +1007,8 @@ export function useAlphaTab(): AlphaTabController {
     setLayout,
     setTrackMute,
     setAllTracksMuted,
+    setTrackDisplay,
+    setAllTracksDisplay,
     setTabOnly,
     setBarStretch,
     applyTrackFilter,

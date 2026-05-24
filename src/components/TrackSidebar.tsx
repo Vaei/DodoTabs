@@ -12,19 +12,32 @@ export default function TrackSidebar({ controller }: Props) {
 
   const anySolo = state.tracks.some((t) => t.soloed);
   const isAudible = (t: (typeof state.tracks)[number]) => (anySolo ? t.soloed : !t.muted);
+  // Effective sheet visibility: "auto" follows audibility, otherwise the pinned value.
+  const isDisplayed = (t: (typeof state.tracks)[number]) =>
+    t.display === "shown" ? true : t.display === "hidden" ? false : isAudible(t);
   const allMuted = state.tracks.length > 0 && state.tracks.every((t) => t.muted);
+  const allShown = state.tracks.length > 0 && state.tracks.every((t) => isDisplayed(t));
 
   return (
     <section className="tracks">
       <div className="tracks__header">
         <span>Tracks</span>
-        <button
-          className="tracks__muteall"
-          onClick={() => controller.setAllTracksMuted(!allMuted)}
-          title={allMuted ? "Unmute all tracks" : "Mute all tracks"}
-        >
-          {allMuted ? "Unmute all" : "Mute all"}
-        </button>
+        <div className="tracks__bulk">
+          <button
+            className="tracks__muteall"
+            onClick={() => controller.setAllTracksMuted(!allMuted)}
+            title={allMuted ? "Unmute all tracks" : "Mute all tracks"}
+          >
+            {allMuted ? "Unmute all" : "Mute all"}
+          </button>
+          <button
+            className="tracks__muteall"
+            onClick={() => controller.setAllTracksDisplay(!allShown)}
+            title={allShown ? "Hide all tracks from the sheet" : "Show all tracks on the sheet"}
+          >
+            {allShown ? "Hide all" : "Show all"}
+          </button>
+        </div>
       </div>
       <div className="tracks__list">
         {state.tracks.map((t) => (
@@ -40,7 +53,7 @@ export default function TrackSidebar({ controller }: Props) {
               <button
                 className={`tag ${t.muted ? "tag--mute" : ""}`}
                 onClick={() => controller.setTrackMute(t.index, !t.muted)}
-                title="Mute / hide this track"
+                title="Mute this track"
               >
                 M
               </button>
@@ -50,6 +63,13 @@ export default function TrackSidebar({ controller }: Props) {
                 title="Solo"
               >
                 S
+              </button>
+              <button
+                className={`tag ${isDisplayed(t) ? "tag--show" : ""}`}
+                onClick={() => controller.setTrackDisplay(t.index, !isDisplayed(t))}
+                title="Show / hide this track on the sheet"
+              >
+                T
               </button>
             </div>
 

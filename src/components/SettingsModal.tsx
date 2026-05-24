@@ -10,6 +10,7 @@ import {
 } from "../lib/useAlphaTab";
 import { KEEP_SCREEN_ON_KEY } from "../lib/useKeepAwake";
 import { AUTO_LOAD_LAST_KEY, METRONOME_SYNC } from "../lib/constants";
+import { isLikelyMobile } from "../lib/runtime";
 import { CloseIcon } from "./Icons";
 
 interface Props {
@@ -32,6 +33,10 @@ export default function SettingsModal({
   onChangeBpmStep,
   onClose,
 }: Props) {
+  // Android can't switch the audio output device (no setSinkId) and granting access
+  // would only trigger a confusing microphone prompt, so the "Grant device access"
+  // button is desktop-only.
+  const mobile = isLikelyMobile();
   const [outputs, setOutputs] = useState<AudioDeviceInfo[]>([]);
   const [inputs, setInputs] = useState<AudioDeviceInfo[]>([]);
   const [outputId, setOutputId] = useState<string>(
@@ -362,7 +367,7 @@ export default function SettingsModal({
                   </option>
                 ))}
               </select>
-              {outputs.length === 0 && (
+              {outputs.length === 0 && !mobile && (
                 <>
                   <button className="btn btn--primary settings-grant" onClick={requestMic}>
                     Grant device access
