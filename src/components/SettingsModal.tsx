@@ -11,7 +11,13 @@ import {
 import { KEEP_SCREEN_ON_KEY } from "../lib/useKeepAwake";
 import { AUTO_LOAD_LAST_KEY, METRONOME_SYNC } from "../lib/constants";
 import { isLikelyMobile } from "../lib/runtime";
-import { CloseIcon } from "./Icons";
+import {
+  AUTO_SAVE_TAB_KEY,
+  listTabSettings,
+  deleteTabSettings,
+  deleteAllTabSettings,
+} from "../lib/tabSettings";
+import { CloseIcon, TrashIcon } from "./Icons";
 
 interface Props {
   controller: AlphaTabController;
@@ -69,6 +75,23 @@ export default function SettingsModal({
   const [autoLoadLast, setAutoLoadLastState] = useState(
     () => (localStorage.getItem(AUTO_LOAD_LAST_KEY) ?? "1") !== "0"
   );
+  const [autoSaveTab, setAutoSaveTabState] = useState(
+    () => localStorage.getItem(AUTO_SAVE_TAB_KEY) === "1"
+  );
+  const [savedTabs, setSavedTabs] = useState<string[]>(() => listTabSettings());
+  const changeAutoSaveTab = (v: boolean) => {
+    setAutoSaveTabState(v);
+    localStorage.setItem(AUTO_SAVE_TAB_KEY, v ? "1" : "0");
+  };
+  const deleteSavedTab = (name: string) => {
+    deleteTabSettings(name);
+    setSavedTabs(listTabSettings());
+  };
+  const deleteAllSavedTabs = () => {
+    if (!window.confirm("Delete saved setups for all tabs?")) return;
+    deleteAllTabSettings();
+    setSavedTabs([]);
+  };
   const changeAutoLoadLast = (v: boolean) => {
     setAutoLoadLastState(v);
     localStorage.setItem(AUTO_LOAD_LAST_KEY, v ? "1" : "0");
@@ -349,6 +372,49 @@ export default function SettingsModal({
           <p className="settings-note">
             Track filters match track names (comma-separated). Hidden tracks are muted too.
           </p>
+        </section>
+
+        <section className="modal__section">
+          <h3>Tab memory</h3>
+          <label className="settings-row">
+            <span>Remember each tab's setup automatically</span>
+            <input
+              type="checkbox"
+              checked={autoSaveTab}
+              onChange={(e) => changeAutoSaveTab(e.target.checked)}
+            />
+          </label>
+          <p className="settings-note">
+            Saves each tab's track mixer (mute/solo/volume/show-hide), speed and zoom by file
+            name, restored when you reopen it. When off, use the <strong>Save</strong> button on
+            the tracks panel to store the open tab (and <strong>Reset</strong> to clear it).
+          </p>
+          {savedTabs.length > 0 ? (
+            <>
+              <div className="saved-tabs">
+                {savedTabs.map((name) => (
+                  <div className="saved-tabs__row" key={name}>
+                    <span className="saved-tabs__name" title={name}>
+                      {name}
+                    </span>
+                    <button
+                      className="saved-tabs__del"
+                      onClick={() => deleteSavedTab(name)}
+                      title={`Delete saved setup for ${name}`}
+                      aria-label={`Delete saved setup for ${name}`}
+                    >
+                      <TrashIcon width={16} height={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button className="btn btn--ghost settings-grant" onClick={deleteAllSavedTabs}>
+                Delete all saved tabs
+              </button>
+            </>
+          ) : (
+            <p className="settings-note">No tabs have a saved setup yet.</p>
+          )}
         </section>
 
         <section className="modal__section">

@@ -37,6 +37,27 @@ export default function TrackSidebar({ controller }: Props) {
           >
             {allShown ? "Hide all" : "Show all"}
           </button>
+          <button
+            className="tracks__muteall"
+            onClick={() => controller.saveTabSettings()}
+            title="Save this tab's track setup, speed and zoom (restored when you reopen it)"
+          >
+            Save
+          </button>
+          <button
+            className="tracks__muteall"
+            onClick={() => {
+              if (
+                window.confirm(
+                  "Reset this tab to defaults? This clears its saved setup and reopens it."
+                )
+              )
+                controller.resetTabSettings();
+            }}
+            title="Clear this tab's saved setup and reopen it at defaults"
+          >
+            Reset
+          </button>
         </div>
       </div>
       <div className="tracks__list">

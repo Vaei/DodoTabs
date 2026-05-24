@@ -188,6 +188,8 @@ textarea {
 }
 .tracks__bulk {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
 }
 .tracks__list {
@@ -195,6 +197,44 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+/* Saved per-tab setups list (Settings -> Tab memory) */
+.saved-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+}
+.saved-tabs__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.saved-tabs__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.saved-tabs__del {
+  flex: 0 0 auto;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: inline-flex;
+}
+.saved-tabs__del:hover {
+  color: var(--mute);
+  background: var(--elevated);
 }
 
 /* Recent files */
@@ -1640,6 +1680,7 @@ body.is-mobile textarea {
   }
   .tracks-drawer .tracks__bulk {
     flex-direction: column;
+    flex-wrap: nowrap;
   }
   .tracks-drawer .tracks__list {
     flex: 1;

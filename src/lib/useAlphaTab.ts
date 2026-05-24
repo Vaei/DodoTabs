@@ -2,6 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as alphaTab from "@coderline/alphatab";
 import type { LoadedFile } from "./runtime";
 import { playCountIn } from "./countIn";
+import {
+  type TabSettings,
+  getTabSettings,
+  setTabSettings,
+  deleteTabSettings,
+  isAutoSaveTab,
+} from "./tabSettings";
 
 export interface AudioDeviceInfo {
   deviceId: string;
@@ -34,6 +41,7 @@ export interface AlphaTabState {
   scoreLoaded: boolean;
   title: string;
   artist: string;
+  fileName: string | null; // name of the loaded file (the per-tab settings key)
   tempo: number; // song's base tempo in BPM (0 until a score is loaded)
   tracks: TrackInfo[];
   playing: boolean;
@@ -65,6 +73,7 @@ const initialState: AlphaTabState = {
   scoreLoaded: false,
   title: "",
   artist: "",
+  fileName: null,
   tempo: 0,
   tracks: [],
   playing: false,
@@ -121,6 +130,10 @@ export interface AlphaTabController {
   setBarStretch: (stretch: number) => void;
   applyTrackFilter: () => void;
   applyDrumGlyphs: () => void;
+  // Per-tab saved setup (track mixer + speed/zoom), keyed by file name.
+  saveTabSettings: () => void;
+  resetTabSettings: () => void;
+  hasSavedTabSettings: () => boolean;
   setSyncDelay: (fn: (allowImmediate: boolean) => number | null | undefined) => void;
   setSyncLoop: (enabled: boolean) => void;
 }
@@ -130,6 +143,11 @@ export function useAlphaTab(): AlphaTabController {
   const viewportRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<alphaTab.AlphaTabApi | null>(null);
   const [state, setState] = useState<AlphaTabState>(initialState);
+  // The currently loaded file (kept so "reset to defaults" can reopen it from memory)
+  // and a mirror of the latest state for reading inside non-reactive callbacks.
+  const currentFileRef = useRef<LoadedFile | null>(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
   // Mirror loop state for use inside non-reactive event handlers; track whether the
   // current loop was turned on automatically by making a selection (vs. manually).
   const loopingRef = useRef(false);
@@ -363,6 +381,40 @@ export function useAlphaTab(): AlphaTabController {
     }));
   }, []);
 
+  // Apply a saved per-tab setup: restore each track's mute/solo/volume/display (matched
+  // by track index) plus the playback speed and zoom. The displaySig effect then renders
+  // the right tracks. Tracks in the save that no longer exist are skipped.
+  const applyTabSettings = useCallback((data: TabSettings) => {
+    const api = apiRef.current;
+    const score = api?.score;
+    if (!api || !score) return;
+    const byIndex = new Map(data.tracks.map((t) => [t.index, t]));
+    for (const track of score.tracks) {
+      const ts = byIndex.get(track.index);
+      if (!ts) continue;
+      api.changeTrackMute([track], ts.muted);
+      api.changeTrackSolo([track], ts.soloed);
+      api.changeTrackVolume([track], ts.volume);
+    }
+    if (Number.isFinite(data.speed) && data.speed > 0) api.playbackSpeed = data.speed;
+    if (Number.isFinite(data.zoom) && data.zoom > 0) {
+      api.settings.display.scale = data.zoom;
+      api.updateSettings();
+      api.render();
+    }
+    setState((s) => ({
+      ...s,
+      speed: Number.isFinite(data.speed) && data.speed > 0 ? data.speed : s.speed,
+      zoom: Number.isFinite(data.zoom) && data.zoom > 0 ? data.zoom : s.zoom,
+      tracks: s.tracks.map((t) => {
+        const ts = byIndex.get(t.index);
+        return ts
+          ? { ...t, muted: ts.muted, soloed: ts.soloed, volume: ts.volume, display: ts.display }
+          : t;
+      }),
+    }));
+  }, []);
+
   useEffect(() => {
     if (!containerRef.current || !viewportRef.current) return;
 
@@ -433,6 +485,7 @@ export function useAlphaTab(): AlphaTabController {
         scoreLoaded: !!score,
         title: score?.title ?? "",
         artist: score?.artist ?? "",
+        fileName: currentFileRef.current?.name ?? null,
         tempo: score?.tempo ?? 0,
         tracks,
         currentTime: 0,
@@ -443,7 +496,11 @@ export function useAlphaTab(): AlphaTabController {
       });
       // Apply the per-song display preferences once the new score is in.
       applyDrumGlyphs();
-      applyTrackFilter();
+      // A saved per-tab setup (track mixer + speed/zoom) wins over the name-based track
+      // filter; the filter is just the default for tabs you haven't customized.
+      const saved = currentFileRef.current ? getTabSettings(currentFileRef.current.name) : null;
+      if (saved) applyTabSettings(saved);
+      else applyTrackFilter();
     });
 
     // Drag-selecting a section on the score sets a playback range (alphaTab built-in).
@@ -693,6 +750,7 @@ export function useAlphaTab(): AlphaTabController {
 
   const loadFile = useCallback((file: LoadedFile) => {
     patch({ error: null });
+    currentFileRef.current = file; // remembered for per-tab settings + "reset" reopen
     // Clear any section loop from the current song before swapping in the new one, so
     // its selection highlight doesn't linger on the next score.
     const api = apiRef.current;
@@ -720,6 +778,61 @@ export function useAlphaTab(): AlphaTabController {
       window.setTimeout(() => observer.disconnect(), 2500);
     }
   }, [patch]);
+
+  // Snapshot the current track mixer + speed/zoom for persistence.
+  const collectSettings = useCallback(
+    (): TabSettings => {
+      const s = stateRef.current;
+      return {
+        tracks: s.tracks.map((t) => ({
+          index: t.index,
+          muted: t.muted,
+          soloed: t.soloed,
+          volume: t.volume,
+          display: t.display,
+        })),
+        speed: s.speed,
+        zoom: s.zoom,
+      };
+    },
+    []
+  );
+
+  // Manually save the open tab's setup under its file name.
+  const saveTabSettings = useCallback(() => {
+    const name = currentFileRef.current?.name;
+    if (name) setTabSettings(name, collectSettings());
+  }, [collectSettings]);
+
+  // Reset the open tab to defaults: drop its saved setup and reopen it from memory.
+  const resetTabSettings = useCallback(() => {
+    const file = currentFileRef.current;
+    if (!file) return;
+    deleteTabSettings(file.name);
+    loadFile(file);
+  }, [loadFile]);
+
+  const hasSavedTabSettings = useCallback(() => {
+    const name = currentFileRef.current?.name;
+    return !!name && getTabSettings(name) != null;
+  }, []);
+
+  // Auto-save the open tab's setup when that preference is on. Keyed on the mixer +
+  // speed/zoom signature (ignores activity/position churn) and debounced so dragging a
+  // volume slider doesn't thrash storage.
+  const saveSig =
+    state.tracks.map((t) => `${t.index}:${+t.muted}:${+t.soloed}:${t.volume}:${t.display}`).join("|") +
+    `|s${state.speed}|z${state.zoom}`;
+  useEffect(() => {
+    if (!state.scoreLoaded || !currentFileRef.current || !isAutoSaveTab()) return;
+    const name = currentFileRef.current.name;
+    const id = window.setTimeout(() => {
+      // Only save if we're still on the same tab (guards a quick tab switch from
+      // writing the previous tab's state under the new tab's name).
+      if (currentFileRef.current?.name === name) setTabSettings(name, collectSettings());
+    }, 400);
+    return () => window.clearTimeout(id);
+  }, [saveSig, state.scoreLoaded, collectSettings]);
 
   // Starting playback goes through the scheduler (so metronome-sync can delay it to
   // the next beat); pausing is always immediate.
@@ -1013,6 +1126,9 @@ export function useAlphaTab(): AlphaTabController {
     setBarStretch,
     applyTrackFilter,
     applyDrumGlyphs,
+    saveTabSettings,
+    resetTabSettings,
+    hasSavedTabSettings,
     setTrackSolo,
     setTrackVolume,
     renderTracks,
