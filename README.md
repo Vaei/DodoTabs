@@ -184,6 +184,11 @@ Bravura, Inter and Space Grotesk fonts (SIL OFL-1.1), and the Tauri/React stack
 ## Changelog
 
 ### 1.0.3
+* Notation settings: show tab only, drum glyphs, and adjustable bar width
+* Filter tracks by name (show-only / hide lists); reopen the last tab on startup
+* Per-track show/hide on the sheet, plus mute-all and show-all buttons
+* Muting or soloing also hides tracks from the sheet
+* Long track names no longer get cut off; settings and mobile layout polish
 * Hid the metronome-sync feature for now (it wasn't reliable yet)
 
 ### 1.0.2
