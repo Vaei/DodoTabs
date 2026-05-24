@@ -2,8 +2,7 @@
 
 ### ⬇️ [Download the latest release](https://github.com/Vaei/DodoTabs/releases/latest)
 
-Just want to use it? Grab the latest build above — the **`_x64-setup.exe`** for Windows
-(it auto-updates itself), or the **`.apk`** to [sideload on Android](#installing-the-android-app-sideload).
+Just want to use it? Grab the latest build above - the **`_x64-setup.exe`** for Windows, or the **`.apk`** to [sideload on Android](#installing-the-android-app-sideload).
 
 ---
 
