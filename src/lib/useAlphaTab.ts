@@ -9,6 +9,7 @@ import {
   deleteTabSettings,
   isAutoSaveTab,
 } from "./tabSettings";
+import { SHOW_VOCALS_ON_TRACK_KEY, applyVocalOverlay } from "./vocalOverlay";
 
 export interface AudioDeviceInfo {
   deviceId: string;
@@ -134,6 +135,8 @@ export interface AlphaTabController {
   saveTabSettings: () => void;
   resetTabSettings: () => void;
   hasSavedTabSettings: () => boolean;
+  // Reload the current file from memory (e.g. to re-apply a display setting cleanly).
+  reloadCurrent: () => void;
   setSyncDelay: (fn: (allowImmediate: boolean) => number | null | undefined) => void;
   setSyncLoop: (enabled: boolean) => void;
 }
@@ -501,6 +504,11 @@ export function useAlphaTab(): AlphaTabController {
       const saved = currentFileRef.current ? getTabSettings(currentFileRef.current.name) : null;
       if (saved) applyTabSettings(saved);
       else applyTrackFilter();
+      // Stamp the vocals onto the other tracks so they show above whatever track is
+      // displayed (Songsterr-style). Mutates the model, so it's redone on each load.
+      if (score && localStorage.getItem(SHOW_VOCALS_ON_TRACK_KEY) === "1") {
+        if (applyVocalOverlay(score)) api.render();
+      }
     });
 
     // Drag-selecting a section on the score sets a playback range (alphaTab built-in).
@@ -817,6 +825,13 @@ export function useAlphaTab(): AlphaTabController {
     return !!name && getTabSettings(name) != null;
   }, []);
 
+  // Reopen the current file from memory (used by display settings that need a fresh score,
+  // e.g. toggling the vocal overlay, which mutates the model).
+  const reloadCurrent = useCallback(() => {
+    const file = currentFileRef.current;
+    if (file) loadFile(file);
+  }, [loadFile]);
+
   // Auto-save the open tab's setup when that preference is on. Keyed on the mixer +
   // speed/zoom signature (ignores activity/position churn) and debounced so dragging a
   // volume slider doesn't thrash storage.
@@ -1129,6 +1144,7 @@ export function useAlphaTab(): AlphaTabController {
     saveTabSettings,
     resetTabSettings,
     hasSavedTabSettings,
+    reloadCurrent,
     setTrackSolo,
     setTrackVolume,
     renderTracks,

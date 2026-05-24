@@ -17,6 +17,7 @@ import {
   deleteTabSettings,
   deleteAllTabSettings,
 } from "../lib/tabSettings";
+import { SHOW_VOCALS_ON_TRACK_KEY } from "../lib/vocalOverlay";
 import { CloseIcon, TrashIcon } from "./Icons";
 
 interface Props {
@@ -68,6 +69,14 @@ export default function SettingsModal({
   const [drumGlyphs, setDrumGlyphsState] = useState(
     () => (localStorage.getItem(DRUM_GLYPHS_KEY) ?? "1") !== "0"
   );
+  const [showVocals, setShowVocalsState] = useState(
+    () => localStorage.getItem(SHOW_VOCALS_ON_TRACK_KEY) === "1"
+  );
+  const changeShowVocals = (v: boolean) => {
+    setShowVocalsState(v);
+    localStorage.setItem(SHOW_VOCALS_ON_TRACK_KEY, v ? "1" : "0");
+    controller.reloadCurrent(); // reopen so the overlay is applied/removed cleanly
+  };
   const [barStretch, setBarStretchState] = useState(() => {
     const v = Number.parseFloat(localStorage.getItem(BAR_STRETCH_KEY) ?? "1");
     return Number.isFinite(v) && v > 0 ? v : 1;
@@ -329,6 +338,18 @@ export default function SettingsModal({
               onChange={(e) => changeDrumGlyphs(e.target.checked)}
             />
           </label>
+          <label className="settings-row">
+            <span>Show vocals on the displayed track</span>
+            <input
+              type="checkbox"
+              checked={showVocals}
+              onChange={(e) => changeShowVocals(e.target.checked)}
+            />
+          </label>
+          <p className="settings-note">
+            Overlays the song's lyrics above whichever track you view, aligned to the music
+            (for tabs that include a vocal/lyrics track).
+          </p>
           <label className="settings-row">
             <span>Bar width</span>
             <span className="settings-inline">
