@@ -207,6 +207,10 @@ Bravura, Inter and Space Grotesk fonts (SIL OFL-1.1), and the Tauri/React stack
 
 ## Changelog
 
+### 1.1.0
+* Per-tab memory: saves each tab's track mixer (mute/solo/volume/show-hide), speed and zoom by file name, and restores it when you reopen the tab.
+* Save and Reset buttons on the tracks panel, an auto-save setting (off by default), and a managed list of saved tabs in Settings.
+
 ### 1.0.3
 * Notation settings: show tab only, drum glyphs, and adjustable bar width
 * Filter tracks by name (show-only / hide lists); reopen the last tab on startup
