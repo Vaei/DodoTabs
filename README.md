@@ -135,14 +135,32 @@ and release builds allow cleartext HTTP so the webview can reach a `http://<lan-
 
 ## Installing the Android app (sideload)
 
-DodoTabs is distributed as a signed APK; no Play Store needed.
+DodoTabs is distributed as a signed APK; no Play Store needed. First get the APK: build it
+with `npm run tauri android build --apk` (output under
+`src-tauri/gen/android/app/build/outputs/apk/universal/release/`), or download one from the
+[latest release](https://github.com/Vaei/DodoTabs/releases/latest).
 
-1. Get the APK: build it with `npm run tauri android build --apk` (output under
-   `src-tauri/gen/android/app/build/outputs/apk/universal/release/`), or use one shared with you.
-2. Copy the `.apk` to the phone (USB, email, a cloud drive, or a download link).
-3. On the phone, open the file. The first time, Android asks to allow installs from this
-   source: tap the prompt, turn on **Allow from this source**, go back, and open the APK again.
-4. Tap **Install**. If Play Protect warns about an unknown app, choose **Install anyway**.
+**Install over the network with ADB (no need to copy the file to the phone):**
+
+1. On the phone, enable **Developer options**, then turn on **Wireless debugging**
+   (Settings, System, Developer options).
+2. First time only, pair the phone: tap **Pair device with pairing code** and run, on the PC,
+   `adb pair <phone-ip>:<pairing-port>`, entering the code the phone shows.
+3. Connect and install from the PC (use the IP and port shown on the Wireless debugging
+   screen, which differ from the pairing port):
+
+   ```bash
+   adb connect <phone-ip>:<port>
+   adb install -r path/to/DodoTabs_<version>.apk
+   ```
+
+   `-r` reinstalls over an existing copy, keeping your data and settings. (Plugged in over
+   USB, just `adb install -r` works without the pair/connect steps.)
+
+**Or install the file on the phone directly:** open the APK on the phone (download it from the
+release page, or copy it over via USB, email or a cloud drive). The first time, Android asks
+to allow installs from this source: turn on **Allow from this source**, go back, and open the
+APK again, then tap **Install** (choose **Install anyway** if Play Protect warns).
 
 To update, just install a newer APK over the top; the shared signing key keeps your data and
 settings. There is no auto-update on Android by design, so a new APK is shared when there is
