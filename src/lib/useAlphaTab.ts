@@ -9,7 +9,12 @@ import {
   deleteTabSettings,
   isAutoSaveTab,
 } from "./tabSettings";
-import { SHOW_VOCALS_ON_TRACK_KEY, applyVocalOverlay } from "./vocalOverlay";
+import {
+  type VocalSource,
+  SHOW_VOCALS_ON_TRACK_KEY,
+  harvestVocalWords,
+  stampVocals,
+} from "./vocalOverlay";
 
 export interface AudioDeviceInfo {
   deviceId: string;
@@ -151,6 +156,12 @@ export function useAlphaTab(): AlphaTabController {
   const currentFileRef = useRef<LoadedFile | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
+  // Vocal overlay: harvested source words (undefined = not computed for this score, null =
+  // none), the beats we've stamped (to clear on change), and the last target index applied
+  // (undefined = unset, null = no stamp / source is top-most).
+  const vocalRef = useRef<VocalSource | null | undefined>(undefined);
+  const stampedBeatsRef = useRef<alphaTab.model.Beat[]>([]);
+  const vocalTargetRef = useRef<number | null | undefined>(undefined);
   // Mirror loop state for use inside non-reactive event handlers; track whether the
   // current loop was turned on automatically by making a selection (vs. manually).
   const loopingRef = useRef(false);
@@ -504,11 +515,11 @@ export function useAlphaTab(): AlphaTabController {
       const saved = currentFileRef.current ? getTabSettings(currentFileRef.current.name) : null;
       if (saved) applyTabSettings(saved);
       else applyTrackFilter();
-      // Stamp the vocals onto the other tracks so they show above whatever track is
-      // displayed (Songsterr-style). Mutates the model, so it's redone on each load.
-      if (score && localStorage.getItem(SHOW_VOCALS_ON_TRACK_KEY) === "1") {
-        if (applyVocalOverlay(score)) api.render();
-      }
+      // Reset the vocal overlay for the new score; the displayed-tracks effect re-applies it
+      // onto the top-most shown track.
+      vocalRef.current = undefined;
+      stampedBeatsRef.current = [];
+      vocalTargetRef.current = undefined;
     });
 
     // Drag-selecting a section on the score sets a playback range (alphaTab built-in).
@@ -755,6 +766,44 @@ export function useAlphaTab(): AlphaTabController {
     setState((s) => ({ ...s, tracks: s.tracks.map((t) => ({ ...t, rendered: want.has(t.index) })) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displaySig]);
+
+  // Vocal overlay: show the sung line above only the top-most displayed track (so it isn't
+  // repeated when several tracks are shown). Re-stamps when the displayed set changes; no-op
+  // when the setting is off, there are no lyrics, or the vocal track is itself top-most.
+  const refreshVocalOverlay = useCallback(() => {
+    const api = apiRef.current;
+    const score = api?.score;
+    if (!api || !score) return;
+
+    let desired: number | null = null;
+    if (localStorage.getItem(SHOW_VOCALS_ON_TRACK_KEY) === "1") {
+      if (vocalRef.current === undefined) vocalRef.current = harvestVocalWords(score);
+      const v = vocalRef.current;
+      if (v) {
+        const rendered = stateRef.current.tracks.filter((t) => t.rendered).map((t) => t.index);
+        if (rendered.length) {
+          const top = Math.min(...rendered);
+          desired = top === v.sourceIndex ? null : top; // source shows its own lyrics
+        }
+      }
+    }
+    if (desired === vocalTargetRef.current) return; // target unchanged
+
+    const hadStamps = stampedBeatsRef.current.length > 0;
+    for (const b of stampedBeatsRef.current) b.lyrics = null; // clear the previous stamp
+    stampedBeatsRef.current = [];
+    if (desired != null && vocalRef.current) {
+      const track = score.tracks.find((t) => t.index === desired);
+      if (track) stampedBeatsRef.current = stampVocals(track, vocalRef.current.words);
+    }
+    vocalTargetRef.current = desired;
+    if (hadStamps || stampedBeatsRef.current.length > 0) api.render();
+  }, []);
+
+  const renderedSig = state.tracks.filter((t) => t.rendered).map((t) => t.index).join(",");
+  useEffect(() => {
+    refreshVocalOverlay();
+  }, [renderedSig, state.scoreLoaded, refreshVocalOverlay]);
 
   const loadFile = useCallback((file: LoadedFile) => {
     patch({ error: null });
