@@ -28,6 +28,7 @@ import {
   loadRecents,
   reopenRecent,
 } from "./lib/recents";
+import { isRestoreSession } from "./lib/session";
 import { FolderIcon, MicIcon, CloseIcon } from "./components/Icons";
 
 function keyOf(source: TabSource): string | null {
@@ -116,15 +117,19 @@ export default function App() {
     [handleOpen]
   );
 
-  // Auto-load the most recently opened tab on startup (on by default).
+  // Auto-load the most recently opened tab on startup (on by default), and restore the
+  // last session (transport, looped section, cursor) onto it unless that's turned off.
   const didAutoLoadRef = useRef(false);
   useEffect(() => {
     if (didAutoLoadRef.current) return;
     didAutoLoadRef.current = true;
     if ((localStorage.getItem(AUTO_LOAD_LAST_KEY) ?? "1") === "0") return;
     const last = loadRecents()[0];
-    if (last) openRecent(last);
-  }, [openRecent]);
+    if (last) {
+      if (isRestoreSession()) controller.armSessionRestore();
+      openRecent(last);
+    }
+  }, [controller, openRecent]);
 
   const clearRecents = useCallback(() => setRecents(clearRecentsStore()), []);
 

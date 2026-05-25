@@ -15,6 +15,7 @@ import {
   harvestVocalWords,
   stampVocals,
 } from "./vocalOverlay";
+import { type SessionState, getSession, setSession } from "./session";
 
 export interface AudioDeviceInfo {
   deviceId: string;
@@ -142,6 +143,9 @@ export interface AlphaTabController {
   hasSavedTabSettings: () => boolean;
   // Reload the current file from memory (e.g. to re-apply a display setting cleanly).
   reloadCurrent: () => void;
+  // Arm a one-shot "restore my last session" for the next score load (used by the
+  // startup auto-load so transport, the looped section and the cursor come back).
+  armSessionRestore: () => void;
   setSyncDelay: (fn: (allowImmediate: boolean) => number | null | undefined) => void;
   setSyncLoop: (enabled: boolean) => void;
 }
@@ -195,6 +199,26 @@ export function useAlphaTab(): AlphaTabController {
   const pendingStartRef = useRef<{ poll?: number; timer?: number }>({});
   // Cancels an in-progress custom (full-speed) count-in; see startWithCountIn.
   const countInCancelRef = useRef<(() => void) | null>(null);
+  // Session restore: armed (one-shot) when the startup auto-load should bring back the
+  // last session; the section + cursor parts wait in pendingPlaybackRestoreRef until the
+  // player + tick cache are ready (they aren't yet when scoreLoaded fires).
+  const restoreSessionArmedRef = useRef(false);
+  const pendingPlaybackRestoreRef = useRef<SessionState | null>(null);
+  // Set while restoring a saved section so the playbackRangeChanged handler doesn't
+  // auto-enable looping (we restore the exact saved loop state ourselves instead).
+  const restoringRangeRef = useRef(false);
+  // Holds a restored section's tick range until its highlight has been re-asserted on a
+  // rendered track; the renderFinished hook keeps redrawing it as the displayed track set
+  // settles (full set -> just the shown tracks), so the band survives the post-restore
+  // re-render. Cleared when the user makes their own selection.
+  const restoredSelectionRef = useRef<{ startTick: number; endTick: number } | null>(null);
+  // True once playerReady has fired for the current score (the worker synth has loaded the
+  // MIDI and accepts playback-range/seek commands). The section + cursor restore must wait
+  // for this; the main-thread tick cache becomes ready earlier, and a range set before the
+  // worker is ready gets discarded when its sequencer initializes.
+  const playerReadyRef = useRef(false);
+  // Latest "save the current session" fn, called from non-reactive handlers / unload.
+  const saveSessionRef = useRef<() => void>(() => {});
 
   const patch = useCallback((p: Partial<AlphaTabState>) => {
     setState((s) => ({ ...s, ...p }));
@@ -429,6 +453,137 @@ export function useAlphaTab(): AlphaTabController {
     }));
   }, []);
 
+  // Apply the parts of a saved session that don't need the player/tick cache yet: the
+  // track mixer, speed, zoom, layout, metronome, count-in mode and snap-to-bar. The
+  // looped section and cursor position need the tick cache + a render, so they are parked
+  // in pendingPlaybackRestoreRef and applied by tryApplyPendingPlaybackRestore once ready.
+  const applySession = useCallback((data: SessionState) => {
+    const api = apiRef.current;
+    const score = api?.score;
+    if (!api || !score) return;
+
+    const byIndex = new Map(data.tracks.map((t) => [t.index, t]));
+    for (const track of score.tracks) {
+      const ts = byIndex.get(track.index);
+      if (!ts) continue;
+      api.changeTrackMute([track], ts.muted);
+      api.changeTrackSolo([track], ts.soloed);
+      api.changeTrackVolume([track], ts.volume);
+    }
+
+    if (Number.isFinite(data.speed) && data.speed > 0) api.playbackSpeed = data.speed;
+    let needRender = false;
+    if (Number.isFinite(data.zoom) && data.zoom > 0) {
+      api.settings.display.scale = data.zoom;
+      needRender = true;
+    }
+    if (data.layout === "page" || data.layout === "horizontal") {
+      api.settings.display.layoutMode =
+        data.layout === "page" ? alphaTab.LayoutMode.Page : alphaTab.LayoutMode.Horizontal;
+      needRender = true;
+    }
+    if (needRender) {
+      api.updateSettings();
+      api.render();
+    }
+
+    api.metronomeVolume = data.metronome ? 1 : 0;
+    // Count-in mode 2 (per-loop) only makes sense with a selected section; drop to "once"
+    // if the saved session somehow has mode 2 without one.
+    const hasSel = !!(data.selection && data.selection.endTick > data.selection.startTick);
+    const countInMode = data.countInMode === 2 && !hasSel ? 1 : data.countInMode;
+    countInModeRef.current = countInMode;
+    api.countInVolume = countInMode > 0 ? 1 : 0;
+    snapBarRef.current = data.snapToBar;
+
+    setState((s) => ({
+      ...s,
+      speed: Number.isFinite(data.speed) && data.speed > 0 ? data.speed : s.speed,
+      zoom: Number.isFinite(data.zoom) && data.zoom > 0 ? data.zoom : s.zoom,
+      layout: data.layout === "horizontal" ? "horizontal" : "page",
+      metronome: data.metronome,
+      countInMode,
+      snapToBar: data.snapToBar,
+      tracks: s.tracks.map((t) => {
+        const ts = byIndex.get(t.index);
+        return ts
+          ? { ...t, muted: ts.muted, soloed: ts.soloed, volume: ts.volume, display: ts.display }
+          : t;
+      }),
+    }));
+
+    // Defer the section + cursor until the player + tick cache are ready.
+    pendingPlaybackRestoreRef.current = data;
+  }, []);
+
+  // (Re)draw a restored section's highlight on the top-most currently-rendered track, so
+  // alphaTab's internal _selectionStart points at a beat that stays rendered (the band is
+  // otherwise wiped when the displayed track set changes right after restore). Idempotent
+  // and safe to call on every render; no-op once there's nothing pending or bounds aren't
+  // ready yet. Does not touch the loop range (that's set separately).
+  const drawRestoredSelection = useCallback(() => {
+    const ticks = restoredSelectionRef.current;
+    if (!ticks) return;
+    const api = apiRef.current;
+    const tc = api?.tickCache;
+    if (!api || !tc) return;
+    const rendered = api.tracks.map((t) => t.index);
+    if (rendered.length === 0) return;
+    const top = Math.min(...rendered);
+    const set = new Set([top]);
+    const startBeat = tc.findBeat(set, ticks.startTick)?.beat ?? null;
+    const endBeat = tc.findBeat(set, ticks.endTick)?.beat ?? null;
+    if (startBeat && endBeat) api.highlightPlaybackRange(startBeat, endBeat);
+  }, []);
+
+  // Restore the looped section and the cursor once the tick cache exists (and a render has
+  // happened so the selection highlight can be drawn). One-shot: clears the pending restore
+  // on success. Called from playerReady and renderFinished.
+  const tryApplyPendingPlaybackRestore = useCallback(() => {
+    const data = pendingPlaybackRestoreRef.current;
+    if (!data) return;
+    const api = apiRef.current;
+    const tc = api?.tickCache;
+    // Wait for the tick cache (highlight) AND the worker synth being ready (so the loop
+    // range/seek actually take effect rather than being discarded during MIDI load).
+    if (!api || !tc || !playerReadyRef.current) return;
+    pendingPlaybackRestoreRef.current = null;
+
+    const sel = data.selection;
+    if (sel && sel.endTick > sel.startTick) {
+      hasSelectionRef.current = true;
+      restoringRangeRef.current = true;
+      // Set the loop range (functional looping + an initial highlight) ...
+      const range = new alphaTab.synth.PlaybackRange();
+      range.startTick = sel.startTick;
+      range.endTick = sel.endTick;
+      api.playbackRange = range;
+      // ... and remember it so the highlight gets re-anchored to a beat on the top shown
+      // track on each render (the band would otherwise vanish when the display set settles).
+      restoredSelectionRef.current = { startTick: sel.startTick, endTick: sel.endTick };
+      drawRestoredSelection();
+    } else {
+      api.playbackRange = null;
+      hasSelectionRef.current = false;
+      restoredSelectionRef.current = null;
+    }
+
+    loopingRef.current = data.looping;
+    autoLoopRef.current = false; // a restored loop is an explicit state, not selection auto-loop
+    applyLooping();
+
+    if (Number.isFinite(data.position) && data.position > 0) {
+      let pos = Math.min(data.position, api.endTick || data.position);
+      // Keep the resume point inside a restored loop so playback starts in the section.
+      if (sel && sel.endTick > sel.startTick) {
+        pos = Math.max(sel.startTick, Math.min(pos, sel.endTick));
+      }
+      api.tickPosition = pos;
+    }
+
+    setState((s) => ({ ...s, looping: data.looping, hasSelection: !!(sel && sel.endTick > sel.startTick) }));
+  }, [applyLooping, drawRestoredSelection]);
+
   useEffect(() => {
     if (!containerRef.current || !viewportRef.current) return;
 
@@ -493,6 +648,9 @@ export function useAlphaTab(): AlphaTabController {
       lastBeatIdRef.current.clear();
       findHintRef.current = null;
       activityRef.current.clear();
+      // Drop any not-yet-applied playback restore from a previous load.
+      pendingPlaybackRestoreRef.current = null;
+      playerReadyRef.current = false; // re-armed by the new score's playerReady
       // Reset playback speed to 1.0x (BPM defaults to the tab's tempo).
       api.playbackSpeed = 1;
       patch({
@@ -520,6 +678,14 @@ export function useAlphaTab(): AlphaTabController {
       vocalRef.current = undefined;
       stampedBeatsRef.current = [];
       vocalTargetRef.current = undefined;
+      // Startup "restore my last session": if armed and the loaded file matches the saved
+      // session, apply it over the top (it reflects the most recent state, so it wins over a
+      // saved per-tab setup). One-shot. The section + cursor finish in playerReady/render.
+      if (restoreSessionArmedRef.current) {
+        restoreSessionArmedRef.current = false;
+        const sess = getSession();
+        if (sess && sess.fileName === currentFileRef.current?.name) applySession(sess);
+      }
     });
 
     // Drag-selecting a section on the score sets a playback range (alphaTab built-in).
@@ -528,7 +694,10 @@ export function useAlphaTab(): AlphaTabController {
       const range = e.playbackRange;
       const has = !!range && range.endTick > range.startTick;
       hasSelectionRef.current = has;
-      if (has && !loopingRef.current) {
+      // A restore sets the exact loop state itself; skip the select-to-loop convenience.
+      const restoring = restoringRangeRef.current;
+      restoringRangeRef.current = false;
+      if (has && !loopingRef.current && !restoring) {
         loopingRef.current = true;
         autoLoopRef.current = true;
         patch({ looping: true });
@@ -572,6 +741,8 @@ export function useAlphaTab(): AlphaTabController {
       api.highlightPlaybackRange(first, last);
     };
     api.beatMouseDown.on((beat) => {
+      // The user is making their own selection now; stop re-asserting the restored one.
+      restoredSelectionRef.current = null;
       // Mobile two-tap selection: first tap anchors the start, second sets the end.
       // alphaTab's own mouse-up applies whatever range we highlight here.
       if (tapSelectRef.current) {
@@ -599,12 +770,20 @@ export function useAlphaTab(): AlphaTabController {
     });
 
     api.renderStarted.on(() => patch({ rendering: true }));
-    api.renderFinished.on(() => patch({ rendering: false }));
+    api.renderFinished.on(() => {
+      patch({ rendering: false });
+      // The selection highlight needs a finished render; the cursor needs the tick cache.
+      tryApplyPendingPlaybackRestore();
+      // Re-anchor a restored section's highlight as the displayed track set settles.
+      drawRestoredSelection();
+    });
 
     api.playerStateChanged.on((e) => {
       const playing = e.state === alphaTab.synth.PlayerState.Playing;
       playingRef.current = playing;
       if (!playing) {
+        // Capture the session now so the cursor position where you paused/stopped is saved.
+        saveSessionRef.current();
         // Clear the live activity meters when playback isn't running.
         activityRef.current.clear();
         setState((s) => ({
@@ -688,6 +867,9 @@ export function useAlphaTab(): AlphaTabController {
 
     // Re-apply a previously chosen audio output device once the player is ready.
     api.playerReady.on(async () => {
+      // Worker synth is ready now; restore the section + cursor (gated on this).
+      playerReadyRef.current = true;
+      tryApplyPendingPlaybackRestore();
       const saved = localStorage.getItem(OUTPUT_DEVICE_KEY);
       if (!saved) return;
       try {
@@ -855,6 +1037,48 @@ export function useAlphaTab(): AlphaTabController {
     []
   );
 
+  // Snapshot the full "where I left off" session: transport toggles, the looped section,
+  // the cursor position and the mixer. Returns null when no tab is open.
+  const collectSession = useCallback((): SessionState | null => {
+    const api = apiRef.current;
+    const name = currentFileRef.current?.name;
+    if (!api || !name) return null;
+    const s = stateRef.current;
+    const range = api.playbackRange;
+    return {
+      fileName: name,
+      speed: s.speed,
+      zoom: s.zoom,
+      layout: s.layout,
+      metronome: s.metronome,
+      countInMode: s.countInMode,
+      snapToBar: s.snapToBar,
+      looping: s.looping,
+      selection:
+        range && range.endTick > range.startTick
+          ? { startTick: range.startTick, endTick: range.endTick }
+          : null,
+      position: api.tickPosition,
+      tracks: s.tracks.map((t) => ({
+        index: t.index,
+        muted: t.muted,
+        soloed: t.soloed,
+        volume: t.volume,
+        display: t.display,
+      })),
+    };
+  }, []);
+
+  // Persist the current session now. No-op when no score is loaded, or while a section/
+  // cursor restore is still pending (saving then would clobber the stored section before
+  // it has been put back).
+  const saveSessionNow = useCallback(() => {
+    if (!stateRef.current.scoreLoaded || pendingPlaybackRestoreRef.current) return;
+    const snap = collectSession();
+    if (snap) setSession(snap);
+  }, [collectSession]);
+  saveSessionRef.current = saveSessionNow;
+
   // Manually save the open tab's setup under its file name.
   const saveTabSettings = useCallback(() => {
     const name = currentFileRef.current?.name;
@@ -881,6 +1105,12 @@ export function useAlphaTab(): AlphaTabController {
     if (file) loadFile(file);
   }, [loadFile]);
 
+  // Arm a one-shot session restore for the next score load (the startup auto-load calls
+  // this so the looped section, transport toggles and cursor come back where you left off).
+  const armSessionRestore = useCallback(() => {
+    restoreSessionArmedRef.current = true;
+  }, []);
+
   // Auto-save the open tab's setup when that preference is on. Keyed on the mixer +
   // speed/zoom signature (ignores activity/position churn) and debounced so dragging a
   // volume slider doesn't thrash storage.
@@ -897,6 +1127,42 @@ export function useAlphaTab(): AlphaTabController {
     }, 400);
     return () => window.clearTimeout(id);
   }, [saveSig, state.scoreLoaded, collectSettings]);
+
+  // Auto-save the "where I left off" session whenever the transport, section, layout or
+  // mixer changes (debounced). The cursor position is captured here too, but mid-playback
+  // it isn't in the signature, so the pause/stop and app-close saves cover the final spot.
+  const sessionSig =
+    `${state.fileName}|s${state.speed}|z${state.zoom}|${state.layout}` +
+    `|m${+state.metronome}|c${state.countInMode}|sb${+state.snapToBar}` +
+    `|lp${+state.looping}|sel${+state.hasSelection}|` +
+    state.tracks
+      .map((t) => `${t.index}:${+t.muted}:${+t.soloed}:${t.volume}:${t.display}`)
+      .join(",");
+  useEffect(() => {
+    if (!state.scoreLoaded || !currentFileRef.current) return;
+    const name = currentFileRef.current.name;
+    const id = window.setTimeout(() => {
+      if (currentFileRef.current?.name === name) saveSessionRef.current();
+    }, 400);
+    return () => window.clearTimeout(id);
+  }, [sessionSig, state.scoreLoaded]);
+
+  // Save the session when the app is hidden or closed, so the exact final cursor position
+  // and any last-moment section are captured even without a pause first.
+  useEffect(() => {
+    const save = () => saveSessionRef.current();
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") save();
+    };
+    window.addEventListener("pagehide", save);
+    window.addEventListener("beforeunload", save);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", save);
+      window.removeEventListener("beforeunload", save);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
 
   // Starting playback goes through the scheduler (so metronome-sync can delay it to
   // the next beat); pausing is always immediate.
@@ -1194,6 +1460,7 @@ export function useAlphaTab(): AlphaTabController {
     resetTabSettings,
     hasSavedTabSettings,
     reloadCurrent,
+    armSessionRestore,
     setTrackSolo,
     setTrackVolume,
     renderTracks,

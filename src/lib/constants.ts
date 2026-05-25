@@ -1,5 +1,5 @@
 // App metadata (single source of truth for the version shown in the About dialog).
-export const APP_VERSION = "1.2.0";
+export const APP_VERSION = "1.3.0";
 export const APP_AUTHOR = "Jared Taylor";
 export const GITHUB_URL = "https://github.com/Vaei/DodoTabs";
 export const APP_LICENSE = "AGPL-3.0";

@@ -18,6 +18,7 @@ import {
   deleteAllTabSettings,
 } from "../lib/tabSettings";
 import { SHOW_VOCALS_ON_TRACK_KEY } from "../lib/vocalOverlay";
+import { RESTORE_SESSION_KEY } from "../lib/session";
 import { CloseIcon, TrashIcon } from "./Icons";
 
 interface Props {
@@ -104,6 +105,13 @@ export default function SettingsModal({
   const changeAutoLoadLast = (v: boolean) => {
     setAutoLoadLastState(v);
     localStorage.setItem(AUTO_LOAD_LAST_KEY, v ? "1" : "0");
+  };
+  const [restoreSession, setRestoreSessionState] = useState(
+    () => (localStorage.getItem(RESTORE_SESSION_KEY) ?? "1") !== "0"
+  );
+  const changeRestoreSession = (v: boolean) => {
+    setRestoreSessionState(v);
+    localStorage.setItem(RESTORE_SESSION_KEY, v ? "1" : "0");
   };
 
   const changeTabOnly = (v: boolean) => {
@@ -214,6 +222,19 @@ export default function SettingsModal({
               onChange={(e) => changeAutoLoadLast(e.target.checked)}
             />
           </label>
+          <label className="settings-row">
+            <span>Pick up where you left off</span>
+            <input
+              type="checkbox"
+              checked={restoreSession}
+              disabled={!autoLoadLast}
+              onChange={(e) => changeRestoreSession(e.target.checked)}
+            />
+          </label>
+          <p className="settings-note">
+            Restores the reopened tab's count-in, metronome, looped section, snap-to-bar,
+            speed, zoom, layout and cursor position from your last session.
+          </p>
         </section>
 
         <section className="modal__section">

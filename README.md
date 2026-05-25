@@ -207,6 +207,9 @@ Bravura, Inter and Space Grotesk fonts (SIL OFL-1.1), and the Tauri/React stack
 
 ## Changelog
 
+### 1.3.0
+* Pick up where you left off: reopening a tab now also restores its looped section, count-in, metronome, snap-to-bar, loop, layout and cursor position from your last session (Settings, on by default alongside reopen-last-tab).
+
 ### 1.2.0
 * Show vocals on the displayed track: overlays the song's lyrics above the top-most shown track, aligned to the music (Settings, off by default).
 * The tracks panel Save button now confirms with a brief toast.
