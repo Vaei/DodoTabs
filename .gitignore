@@ -10,10 +10,6 @@ dist-ssr/
 # Convenience shortcut to the built installer (points into target/)
 *.lnk
 
-# alphaTab assets copied into the build at dev/build time (sourced from node_modules)
-public/font/
-public/soundfont/
-
 # ---- Logs & caches ----
 *.log
 npm-debug.log*

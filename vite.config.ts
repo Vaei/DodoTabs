@@ -8,10 +8,12 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig({
   plugins: [
     react(),
-    // Official alphaTab plugin: wires up the render web-worker and audio worklet,
-    // and copies the Bravura music font + sonivox soundfont into the build output
-    // (served at /font/ and /soundfont/).
-    ...alphaTab(),
+    // Official alphaTab plugin: wires up the render web-worker and audio worklet.
+    // assetOutputDir:false disables its asset copy - we ship the Bravura font and the
+    // playback soundfont ourselves from public/font/ and public/soundfont/ (served at
+    // /font/ and /soundfont/), so the plugin doesn't also dump its bundled Sonivox
+    // soundfont and mismatched license into the build.
+    ...alphaTab({ assetOutputDir: false }),
   ],
 
   // The cloned alphaTab monorepo lives under this folder for reference only.

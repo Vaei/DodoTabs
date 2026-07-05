@@ -1,5 +1,5 @@
 // App metadata (single source of truth for the version shown in the About dialog).
-export const APP_VERSION = "1.3.0";
+export const APP_VERSION = "1.4.0";
 export const APP_AUTHOR = "Jared Taylor";
 export const GITHUB_URL = "https://github.com/Vaei/DodoTabs";
 export const APP_LICENSE = "AGPL-3.0";
@@ -24,9 +24,9 @@ export const THIRD_PARTY_LICENSES: LicenseEntry[] = [
     url: "https://github.com/CoderLine/alphaTab",
   },
   {
-    name: "Sonivox EAS soundfont",
-    license: "Apache-2.0",
-    url: "https://github.com/CoderLine/alphaTab",
+    name: "GeneralUser GS soundfont (S. Christian Collins)",
+    license: "GeneralUser GS License v2.0",
+    url: "https://github.com/mrbumpy409/GeneralUser-GS",
   },
   {
     name: "Bravura music font",

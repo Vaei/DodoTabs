@@ -201,11 +201,14 @@ npm run tauri build
 ## License
 
 DodoTabs is licensed under the [GNU AGPL-3.0](LICENSE). It bundles third-party components
-under their own licenses: alphaTab (MPL-2.0), the Sonivox EAS soundfont (Apache-2.0), the
+under their own licenses: alphaTab (MPL-2.0), the GeneralUser GS soundfont (GeneralUser GS License v2.0), the
 Bravura, Inter and Space Grotesk fonts (SIL OFL-1.1), and the Tauri/React stack
 (MIT/Apache-2.0). The full list is in the in-app **About -> Licenses** screen.
 
 ## Changelog
+
+### 1.4.0
+* Richer playback: replaced the bundled soundfont with GeneralUser GS for far more realistic guitar (and all-instrument) tone.
 
 ### 1.3.0
 * Pick up where you left off: reopening a tab now also restores its looped section, count-in, metronome, snap-to-bar, loop, layout and cursor position from your last session (Settings, on by default alongside reopen-last-tab).

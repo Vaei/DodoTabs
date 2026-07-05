@@ -615,7 +615,7 @@ export function useAlphaTab(): AlphaTabController {
     res.barNumberColor = new alphaTab.model.Color(0xff, 0x8a, 0x3d, 0xff);
 
     settings.player.playerMode = alphaTab.PlayerMode.EnabledAutomatic;
-    settings.player.soundFont = "/soundfont/sonivox.sf2";
+    settings.player.soundFont = "/soundfont/GeneralUser-GS.sf2";
     settings.player.scrollElement = viewportRef.current;
     settings.player.scrollMode = alphaTab.ScrollMode.Continuous;
     settings.player.enableCursor = true;

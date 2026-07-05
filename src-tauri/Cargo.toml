@@ -1,6 +1,6 @@
 [package]
 name = "dodotabs"
-version = "1.3.0"
+version = "1.4.0"
 description = "Guitar tab player powered by alphaTab"
 authors = ["DodoTabs"]
 edition = "2021"
